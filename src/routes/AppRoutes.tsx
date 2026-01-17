@@ -12,6 +12,11 @@ import CustomerItemDetailPage from "../pages/customer/CustomerMenuDetail";
 import CustomerLoginPage from "../pages/customer/CustomerLogin";
 import CustomerRegisterPage from "../pages/customer/CustomerRegister";
 import AccountsPage from "../pages/admin/AccountsPage";
+import StaffLayout from "../layouts/StaffLayout";
+import MonitorWaiterLayout from "../pages/staff/waiter/MonitorWaiterLayout";
+import MonitorWaiterOrdersPage from "../pages/staff/waiter/MonitorWaiterOrdersPage";
+import MonitorWaiterBillsPage from "../pages/staff/waiter/MonitorWaiterBillsPage";
+import MonitorKdsPage from "../pages/staff/kds/MonitorKdsPage";
 
 export default function AppRoute() {
   return (
@@ -43,6 +48,21 @@ export default function AppRoute() {
         <Route path="/menu/categories" element={<MenuCategories />} />
         <Route path="/menu/items" element={<MenuItems />} />
         <Route path="/accounts" element={<AccountsPage />} />
+      </Route>
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <StaffLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/monitor/waiter" element={<MonitorWaiterLayout />}>
+          <Route index element={<Navigate to="/monitor/waiter/orders" replace />} />
+          <Route path="orders" element={<MonitorWaiterOrdersPage />} />
+          <Route path="bills" element={<MonitorWaiterBillsPage />} />
+        </Route>
+        <Route path="/monitor/kds" element={<MonitorKdsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

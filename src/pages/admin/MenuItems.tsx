@@ -20,7 +20,6 @@ import {
   Edit3,
   Trash2,
   Layers,
-  Loader2
 } from "lucide-react";
 
 const LIMIT_OPTIONS = [12, 24, 48];

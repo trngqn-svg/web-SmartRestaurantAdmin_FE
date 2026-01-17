@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Table } from "../../types/tables";
 import {
   getTables,
@@ -25,6 +25,8 @@ import {
   X,
   Loader2,
 } from "lucide-react";
+import type { Socket } from "socket.io-client";
+import { connectStaffSocket } from "../../ws/staffSocket";
 
 const Tables = () => {
   const [tables, setTables] = useState<Table[]>([]);
@@ -38,6 +40,34 @@ const Tables = () => {
   const [toggleTarget, setToggleTarget] = useState<Table | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    if (!socketRef.current) {
+      socketRef.current = connectStaffSocket();
+    }
+
+    const socket = socketRef.current;
+
+    const onTableStatusChanged = (p: any) => {
+      setTables((prev) =>
+        prev.map((t) =>
+          String(t.id) === String(p.tableId)
+            ? {
+                ...t,
+                status: p.status ?? t.status,
+              }
+            : t
+        )
+      );
+    };
+
+    socket.on("table.status_changed", onTableStatusChanged);
+
+    return () => {
+      socket.off("table.status_changed", onTableStatusChanged);
+    };
+  }, []);
 
   const [qrData, setQrData] = useState<{
     tableId: string;

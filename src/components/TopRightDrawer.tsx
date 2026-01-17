@@ -23,6 +23,13 @@ const MENU_SECTIONS = [
       { label: 'Accounts', to: '/accounts' },
     ],
   },
+  {
+    title: 'Staff panel',
+    items: [
+      { label: 'Waiter', to: '/monitor/waiter' },
+      { label: 'Kitchen Display', to: '/monitor/kds'}
+    ]
+  }
 ];
 
 export default function TopRightDrawer() {
@@ -111,7 +118,7 @@ export default function TopRightDrawer() {
                   </NavLink>
                 ))}
               </div>
-              {idx === 0 && <div className="mt-2 mb-4 border-b border-gray-300" />}
+              {idx < MENU_SECTIONS.length - 1 && <div className="mt-2 mb-4 border-b border-gray-300" />}
             </div>
           ))}
         </nav>
