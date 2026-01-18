@@ -1,23 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { getCustomerMenu } from "../../api/customer/menu";
 import type { CustomerMenuResponse } from "../../api/customer/menu";
-import { AlignJustify, Search, Home, ShoppingCart, ClipboardList, User2, Star, Utensils } from "lucide-react";
+import { Search, Plus, Utensils, Star } from "lucide-react";
 import { fileUrl } from "../../utils/fileUrl";
+import BottomNavMobileStyled from "../../components/customer/BottomNavMobileStyled";
 
 function cn(...xs: Array<string | false | undefined | null>) {
   return xs.filter(Boolean).join(" ");
-}
-
-function Stars({ value = 5 }: { value?: number }) {
-  const n = Math.max(0, Math.min(5, Math.round(value)));
-  return (
-    <span className="inline-flex items-center gap-0.5 text-orange-400">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star key={i} className={cn("h-4 w-4", i < n && "fill-current")} />
-      ))}
-    </span>
-  );
 }
 
 function StatusPill({ status }: { status: string }) {
@@ -111,18 +101,19 @@ export default function CustomerMenuPage() {
         {/* Header */}
         <div className="rounded-t-[28px] bg-slate-900 px-4 pt-4 pb-5">
           <div className="relative flex items-center justify-center">
-            <button
-              className="absolute left-0 inline-flex h-10 w-10 items-center justify-center rounded-xl text-[#E2B13C]"
-              type="button"
-              aria-label="Open menu"
-            >
-              <AlignJustify className="h-5 w-5" />
-            </button>
+            <div
+              className="absolute left-0 inline-flex h-10 w-10 items-center justify-center">
+            </div>
 
             <h1 className="text-[#E2B13C] text-lg font-semibold">Smart Restaurant</h1>
 
-            <div className="absolute right-0 rounded-full bg-white/20 px-4 py-1.5 text-sm text-[#E2B13C]">
-              Customer
+            <div className="absolute right-0 rounded-full px-4 py-1.5 text-sm text-[#E2B13C]">
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+                  Table
+                </span>
+                <span className="text-lg font-black text-[#E2B13C] leading-none">
+                  #1
+                </span>
             </div>
           </div>
 
@@ -197,7 +188,7 @@ export default function CustomerMenuPage() {
         </div>
       </div>
 
-      <BottomNavFixed cartCount={2} />
+      <BottomNavMobileStyled cartCount={2}/>
     </div>
   );
 }
@@ -237,7 +228,10 @@ function MenuCard(props: {
           <div className="truncate text-[17px] font-semibold text-slate-800">{name}</div>
 
           <div className="mt-1 flex items-center gap-2 text-sm">
-            <Stars value={rating} />
+            <Star className="w-4 h-4 text-[#E2B13C] fill-[#E2B13C]" />
+            <span className="text-sm font-bold">
+              {rating || 0.0}
+            </span>
             <span className="text-orange-500">({reviews} reviews)</span>
           </div>
 
@@ -252,57 +246,22 @@ function MenuCard(props: {
           <div className="mt-3 flex items-center justify-between">
             <div className="text-xl font-bold text-slate-900">${price.toFixed(2)}</div>
 
-            {canOrder ? (
-              <span className="rounded-full px-6 py-2.5 text-sm font-semibold shadow-sm bg-slate-900 text-[#E2B13C]">
-                Add
-              </span>
-            ) : null}
+            <div className="shrink-0">
+              <button
+                disabled={canOrder}
+                className={cn(
+                  "h-10 w-10 rounded-2xl flex items-center justify-center transition-all shadow-lg",
+                  canOrder
+                    ? "bg-[#0F172A] text-[#E2B13C] hover:bg-[#E2B13C] hover:text-[#0F172A]"
+                    : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                )}
+              >
+                <Plus className="w-5 h-5" strokeWidth={3} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </button>
-  );
-}
-
-function BottomNavFixed({ cartCount }: { cartCount: number }) {
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-10">
-      <div className="mx-auto w-full max-w-[400px]">
-        <div className="bg-white shadow-[0_-10px_28px_rgba(15,23,42,0.10)]">
-          <div className="flex items-center justify-around px-4 py-3">
-            <NavTab to="/customer/menu" label="Menu" icon={<Home className="h-6 w-6" />} end />
-            <NavTab
-              to="/customer/cart"
-              label="Cart"
-              icon={
-                <div className="relative">
-                  <ShoppingCart className="h-6 w-6" />
-                  {cartCount > 0 && (
-                    <span className="absolute -right-2 -top-2 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#E64B3C] px-1 text-[11px] font-bold text-white">
-                      {cartCount}
-                    </span>
-                  )}
-                </div>
-              }
-            />
-            <NavTab to="/customer/orders" label="Orders" icon={<ClipboardList className="h-6 w-6" />} />
-            <NavTab to="/customer/profile" label="Profile" icon={<User2 className="h-6 w-6" />} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NavTab(props: { to: string; label: string; icon: React.ReactNode; end?: boolean }) {
-  return (
-    <NavLink
-      to={props.to}
-      end={props.end}
-      className={({ isActive }) => cn("flex w-1/4 flex-col items-center gap-1", isActive ? "text-[#E64B3C]" : "text-slate-500")}
-    >
-      <div>{props.icon}</div>
-      <div className="text-xs">{props.label}</div>
-    </NavLink>
   );
 }

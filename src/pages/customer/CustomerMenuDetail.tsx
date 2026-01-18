@@ -12,7 +12,7 @@ function cn(...xs: Array<string | false | undefined | null>) {
 
 type MenuItemDTO = {
   id: string;
-  categoryId?: string; // ✅ để related theo category
+  categoryId?: string;
   name: string;
   description?: string;
   price: number;
@@ -319,7 +319,7 @@ export default function CustomerMenuDetail() {
                               onClick={() => togglePick(g, o._id)}
                               className={cn(
                                 "w-full flex items-center justify-between rounded-xl border px-3 py-2 text-left",
-                                active ? "border-[#E64B3C] bg-[#E64B3C]/5" : "border-slate-200 bg-white"
+                                active ? "border-emerald-600 bg-emerald-50" : "border-slate-200 bg-white"
                               )}
                             >
                               <div className="flex items-center gap-2">
@@ -327,8 +327,8 @@ export default function CustomerMenuDetail() {
                                   className={cn(
                                     "inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs",
                                     active
-                                      ? "border-[#E64B3C] text-[#E64B3C]"
-                                      : "border-slate-300 text-slate-400"
+                                      ? "border-emerald-600 bg-emerald-50 text-emerald-700"
+                                      : "border-slate-300 text-slate-300"
                                   )}
                                 >
                                   {isSingle ? (active ? "●" : "○") : active ? "☑" : "☐"}
@@ -353,7 +353,7 @@ export default function CustomerMenuDetail() {
 
           {/* Instructions */}
           <div className="mt-6 space-y-2">
-            <div className="text-sm font-semibold text-slate-800">Special Instructions</div>
+            <div className="text-sm font-semibold text-slate-800">Note</div>
             <textarea
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
@@ -387,7 +387,10 @@ export default function CustomerMenuDetail() {
             <div className="h-px bg-slate-100" />
 
             {/* Reviews */}
-            <div className="text-sm font-semibold text-slate-800">Reviews ({ratingCount})</div>
+            <div className="text-sm font-semibold text-slate-800">
+              Reviews
+              <div className="text-xs font-normal text-gray-500">{ratingCount} review</div>
+            </div>
 
             {reviewsLoading ? (
               <div className="text-sm text-slate-400">Loading reviews...</div>
