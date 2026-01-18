@@ -7,7 +7,7 @@ import {
   type StaffOrder,
   type StaffOrderLine,
 } from "../../../api/staff/staff.orders";
-import { Wifi, WifiOff, StickyNote, RefreshCw, Search } from "lucide-react";
+import { Wifi, WifiOff, StickyNote, RefreshCw } from "lucide-react";
 
 type TabKey = "accepted" | "preparing" | "ready";
 
@@ -22,8 +22,6 @@ type KdsOrder = {
   items?: StaffOrderLine[];
   prepTimeMinutes?: number;
 };
-
-type DatePreset = "today" | "yesterday" | "this_week" | "this_month";
 
 function clamp(n: number, a: number, b: number) {
   return Math.max(a, Math.min(b, n));
@@ -52,19 +50,6 @@ export default function MonitorKdsPage() {
     tabRef.current = tab;
   }, [tab]);
 
-  // filters
-  const [tableQ, setTableQ] = useState(""); // search table number
-  const qRef = useRef<string>("");
-  useEffect(() => {
-    qRef.current = tableQ;
-  }, [tableQ]);
-
-  const [datePreset, setDatePreset] = useState<DatePreset>("today");
-  const dateRef = useRef<DatePreset>("today");
-  useEffect(() => {
-    dateRef.current = datePreset;
-  }, [datePreset]);
-
   // paging
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
@@ -89,7 +74,6 @@ export default function MonitorKdsPage() {
 
   function getLinePrepMinutes(o: KdsOrder, li: StaffOrderLine) {
     const v = Number((li as any).prepTimeMinutes ?? o.prepTimeMinutes ?? 1);
-    // minutes * qty (tối thiểu 1 phút)
     return Math.max(1, Number.isFinite(v) ? v * li.qty : 1);
   }
 
@@ -103,19 +87,17 @@ export default function MonitorKdsPage() {
 
   async function loadQueue(opts?: { silent?: boolean; resetPage?: boolean }) {
     const silent = !!opts?.silent;
-
     try {
       setErr(null);
       if (!silent) setLoading(true);
 
+      const nextPage = opts?.resetPage ? 1 : page;
       if (opts?.resetPage) setPage(1);
 
       const res = await listStaffOrdersForMonitorApi({
-        status: tabRef.current, // accepted | preparing | ready
-        page: opts?.resetPage ? 1 : page,
+        status: tabRef.current,
+        page: nextPage,
         limit,
-        q: (qRef.current || "").trim() || undefined,
-        datePreset: dateRef.current,
       });
 
       const { orders: rows, total: t } = normalizeOrdersResponse(res);
@@ -151,7 +133,6 @@ export default function MonitorKdsPage() {
 
   // initial + tab change
   useEffect(() => {
-    // đổi tab thì reset page
     loadQueue({ resetPage: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
@@ -162,7 +143,7 @@ export default function MonitorKdsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  // socket: monitor nên reload theo tab/filter hiện tại (đỡ patch sai)
+  // socket: monitor reload
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -191,11 +172,10 @@ export default function MonitorKdsPage() {
     socket.on("disconnect", onDisconnect);
     socket.on("connect_error", onConnectError);
 
-    // events that affect KDS queue
     socket.on("order.accepted", refresh);
     socket.on("order.status_changed", refresh);
     socket.on("order.line_status_changed", refresh);
-    socket.on("order.submitted", refresh); // nếu bạn có emit
+    socket.on("order.submitted", refresh);
 
     return () => {
       try {
@@ -236,12 +216,6 @@ export default function MonitorKdsPage() {
       active ? "bg-[#E2B13C]" : "bg-transparent"
     );
 
-  const dateBtn = (active: boolean) =>
-    cn(
-      "rounded-xl px-3 py-2 text-xs font-extrabold border",
-      active ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    );
-
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -267,7 +241,7 @@ export default function MonitorKdsPage() {
           </div>
 
           <button
-            onClick={() => loadQueue()}
+            onClick={() => loadQueue({ resetPage: true })}
             className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-extrabold text-white hover:bg-white/15"
             title="Refresh"
           >
@@ -297,57 +271,13 @@ export default function MonitorKdsPage() {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="mx-auto max-w-5xl px-4 pt-4">
-        <div className="rounded-2xl border bg-white p-3 shadow-sm">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2">
-              <button className={dateBtn(datePreset === "today")} onClick={() => setDatePreset("today")}>
-                Today
-              </button>
-              <button className={dateBtn(datePreset === "yesterday")} onClick={() => setDatePreset("yesterday")}>
-                Yesterday
-              </button>
-              <button className={dateBtn(datePreset === "this_week")} onClick={() => setDatePreset("this_week")}>
-                This week
-              </button>
-              <button className={dateBtn(datePreset === "this_month")} onClick={() => setDatePreset("this_month")}>
-                This month
-              </button>
-
-              <button
-                onClick={() => loadQueue({ resetPage: true })}
-                className="ml-1 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-extrabold text-white hover:bg-slate-800"
-                title="Apply filters"
-              >
-                Apply
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div className="relative w-full md:w-[260px]">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={tableQ}
-                  onChange={(e) => setTableQ(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") loadQueue({ resetPage: true });
-                  }}
-                  placeholder="Search by table number..."
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm font-semibold text-slate-800 outline-none focus:border-slate-400"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-2 text-xs font-semibold text-slate-500">
-            Total: <span className="text-slate-800">{total}</span> • Page {page}/{totalPages}
-          </div>
-        </div>
-      </div>
-
       {/* Content */}
       <div className="mx-auto max-w-5xl p-4">
+        <div className="mb-3 text-xs font-semibold text-slate-500">
+          Total: <span className="text-slate-800">{total}</span> • Page{" "}
+          <span className="text-slate-800">{page}</span>/<span className="text-slate-800">{totalPages}</span>
+        </div>
+
         {err ? (
           <div className="mb-3 rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
             {err}
@@ -408,7 +338,7 @@ export default function MonitorKdsPage() {
                         const lst = String(li.status || "queued").toLowerCase();
                         const mins = getLinePrepMinutes(o, li);
 
-                        // ✅ FIX: minutes -> ms
+                        // minutes -> ms
                         const durationMs = mins * 60_000;
 
                         const k = lineKey(o.orderId, li.lineId);
@@ -434,7 +364,6 @@ export default function MonitorKdsPage() {
                             ? "Done"
                             : "Waiting";
 
-                        // mark start when tab is preparing and line status says preparing
                         if (lst === "preparing") markLineStarted(o.orderId, li.lineId);
 
                         return (
@@ -449,12 +378,8 @@ export default function MonitorKdsPage() {
                                 <div className="mt-1 text-xs text-slate-500">
                                   Status: <span className="font-semibold">{lst}</span> • Prep{" "}
                                   <span className="font-semibold">{mins} min</span>
-                                  {tab === "preparing" ? (
-                                    <>
-                                      {" "}
-                                      • <span className="font-semibold">{remainingLabel}</span>
-                                    </>
-                                  ) : null}
+                                  {" • "}
+                                  <span className="font-semibold">{remainingLabel}</span>
                                 </div>
 
                                 {(li as any).modifiers?.length ? (
@@ -481,35 +406,29 @@ export default function MonitorKdsPage() {
                                   </div>
                                 ) : null}
 
-                                {/* progress bar only in preparing tab */}
-                                {tab === "preparing" ? (
-                                  <div className="mt-3">
-                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
-                                      <div
-                                        className={cn(
-                                          "h-full rounded-full transition-[width] duration-1000",
-                                          lst === "ready"
-                                            ? "bg-emerald-600"
-                                            : lst === "preparing"
-                                            ? "bg-[#E2B13C]"
-                                            : "bg-slate-300"
-                                        )}
-                                        style={{ width: `${pct}%` }}
-                                      />
-                                    </div>
-
-                                    <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-slate-500">
-                                      <span>
-                                        {lst === "preparing"
-                                          ? "Cooking…"
-                                          : lst === "ready"
-                                          ? "Completed"
-                                          : "Queued"}
-                                      </span>
-                                      <span>{Math.round(pct)}%</span>
-                                    </div>
+                                {/* progress bar */}
+                                <div className="mt-3">
+                                  <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                    <div
+                                      className={cn(
+                                        "h-full rounded-full transition-[width] duration-1000",
+                                        lst === "ready"
+                                          ? "bg-emerald-600"
+                                          : lst === "preparing"
+                                          ? "bg-[#E2B13C]"
+                                          : "bg-slate-300"
+                                      )}
+                                      style={{ width: `${pct}%` }}
+                                    />
                                   </div>
-                                ) : null}
+
+                                  <div className="mt-1 flex items-center justify-between text-[11px] font-semibold text-slate-500">
+                                    <span>
+                                      {lst === "preparing" ? "Cooking…" : lst === "ready" ? "Completed" : "Queued"}
+                                    </span>
+                                    <span>{Math.round(pct)}%</span>
+                                  </div>
+                                </div>
                               </div>
 
                               <div className="shrink-0 text-sm font-extrabold text-slate-900">
@@ -538,7 +457,9 @@ export default function MonitorKdsPage() {
           <button
             className={cn(
               "rounded-xl border px-3 py-2 text-sm font-extrabold",
-              page <= 1 ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+              page <= 1
+                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
             )}
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -553,7 +474,9 @@ export default function MonitorKdsPage() {
           <button
             className={cn(
               "rounded-xl border px-3 py-2 text-sm font-extrabold",
-              page >= totalPages ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed" : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+              page >= totalPages
+                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
             )}
             disabled={page >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

@@ -30,10 +30,10 @@ const CustomLogin = () => {
           <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
             {/* Email Field */}
             <div className="space-y-1.5">
-              <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider ml-1">Email</label>
+              <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider ml-1">Username / Email</label>
               <input
                 type="email"
-                placeholder="chef@smartrestaurant.com"
+                placeholder="Enter your username/email"
                 className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-[15px] outline-none transition-all focus:bg-white focus:ring-4 focus:ring-[#E2B13C]/10 focus:border-[#E2B13C]"
               />
             </div>
@@ -43,7 +43,7 @@ const CustomLogin = () => {
               <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
               <input
                 type="password"
-                placeholder="••••••••"
+                placeholder="Enter your password"
                 className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-[15px] outline-none transition-all focus:bg-white focus:ring-4 focus:ring-[#E2B13C]/10 focus:border-[#E2B13C]"
               />
               <div className="flex justify-end pr-1 pt-1">
@@ -63,9 +63,9 @@ const CustomLogin = () => {
             </button>
 
             {/* Divider */}
-            <div className="relative flex items-center py-4">
+            <div className="relative flex items-center py-2">
               <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink mx-4 text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">or continue with</span>
+              <span className="flex-shrink mx-4 text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em]">or</span>
               <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
@@ -96,12 +96,6 @@ const CustomLogin = () => {
                 Sign Up
               </button>
             </p>
-            <button 
-              onClick={() => nav('/customer/menu')}
-              className="flex items-center justify-center gap-2 w-full text-[14px] font-bold text-slate-400 hover:text-slate-600 transition-colors"
-            >
-              Continue as Guest <ArrowRight size={16} />
-            </button>
           </div>
         </div>
       </div>

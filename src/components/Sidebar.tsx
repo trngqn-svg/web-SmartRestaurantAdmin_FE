@@ -6,7 +6,9 @@ import {
   Layers, 
   Grid2X2, 
   UtensilsCrossed,
-  User
+  User,
+  ChartColumn,
+  ReceiptText
 } from 'lucide-react';
 
 interface SidebarLinkProps {
@@ -65,6 +67,8 @@ export default function Sidebar() {
         <SidebarLink to="/menu/items" icon={<Utensils size={20} />} label="Menu Items" />
         <SidebarLink to="/menu/categories" icon={<Layers size={20} />} label="Categories" />
         <SidebarLink to="/tables" icon={<Grid2X2 size={20} />} label="Tables" />
+        <SidebarLink to="/orders" icon={<ReceiptText size={20} />} label="Orders" />
+        <SidebarLink to="/reports" icon={<ChartColumn size={20} />} label="Reports" />
         <SidebarLink to="/accounts" icon={<User size={20} />} label="Accounts" />
       </nav>
 

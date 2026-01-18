@@ -53,7 +53,7 @@ export default function MonitorWaiterBillsPage() {
       const q = (qRef.current || "").trim() || undefined;
 
       const data = await listStaffBillsForMonitorApi({ status, q });
-      setBills(data || []);
+      setBills(data.bills || []);
     } catch (e: any) {
       setBillsErr(e?.message || "Load bills failed");
     } finally {
@@ -121,9 +121,9 @@ export default function MonitorWaiterBillsPage() {
                 {st}
               </span>
 
-              {r.paidMethod ? (
+              {r.method ? (
                 <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-extrabold text-slate-700">
-                  {r.paidMethod}
+                  {r.method}
                 </span>
               ) : null}
             </div>

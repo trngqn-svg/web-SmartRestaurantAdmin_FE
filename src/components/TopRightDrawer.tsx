@@ -11,6 +11,9 @@ const MENU_SECTIONS = [
       { label: 'Login', to: '/customer/login' },
       { label: 'Register', to: '/customer/register' },
       { label: 'Menu', to: '/customer/menu' },
+      { label: 'Cart', to: '/customer/cart' },
+      { label: 'Orders', to: '/customer/orders' },
+      { label: 'Profile', to: '/customer/profile' },
     ],
   },
   {
@@ -20,6 +23,8 @@ const MENU_SECTIONS = [
       { label: 'Menu Items', to: '/menu/items' },
       { label: 'Categories', to: '/menu/categories' },
       { label: 'Tables', to: '/tables' },
+      { label: 'Orders', to: '/orders' },
+      { label: 'Reports', to: '/reports' },
       { label: 'Accounts', to: '/accounts' },
     ],
   },

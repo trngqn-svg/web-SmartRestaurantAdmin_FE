@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AdminLayout from "../layouts/AdminLayout";
-import Dashboard from "../pages/admin/Dashboard";
+import DashboardPage from "../pages/admin/DashboardPage";
 import Tables from "../pages/admin/Table";
 import Login from "../pages/admin/Login";
 import MenuCategories from "../pages/admin/MenuCategories";
@@ -17,6 +17,12 @@ import MonitorWaiterLayout from "../pages/staff/waiter/MonitorWaiterLayout";
 import MonitorWaiterOrdersPage from "../pages/staff/waiter/MonitorWaiterOrdersPage";
 import MonitorWaiterBillsPage from "../pages/staff/waiter/MonitorWaiterBillsPage";
 import MonitorKdsPage from "../pages/staff/kds/MonitorKdsPage";
+import ReportsPage from "../pages/admin/ReportsPage";
+import OrdersPage from "../pages/admin/OrdersPage";
+import CustomerCartPage from "../pages/customer/CustomerCartPage";
+import CustomerOrderPage from "../pages/customer/CustomerOrderPage";
+import CustomerProfilePage from "../pages/customer/CustomerProfilePage";
+import CustomerBillPage from "../pages/customer/CustomerBillPage";
 
 export default function AppRoute() {
   return (
@@ -34,6 +40,10 @@ export default function AppRoute() {
         <Route path="/customer/register" element={<CustomerRegisterPage />} />
         <Route path="/customer/menu" element={<CustomerMenuPage />} />
         <Route path="/customer/menu/:id" element={<CustomerItemDetailPage />} />
+        <Route path="/customer/cart" element={<CustomerCartPage />} />
+        <Route path="/customer/orders" element={<CustomerOrderPage />} />
+        <Route path="/customer/bill" element={<CustomerBillPage />} />
+        <Route path="/customer/profile" element={<CustomerProfilePage />} />
       </Route>
 
       <Route
@@ -43,10 +53,12 @@ export default function AppRoute() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/tables" element={<Tables />} />
         <Route path="/menu/categories" element={<MenuCategories />} />
         <Route path="/menu/items" element={<MenuItems />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/reports" element={<ReportsPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
       </Route>
 
