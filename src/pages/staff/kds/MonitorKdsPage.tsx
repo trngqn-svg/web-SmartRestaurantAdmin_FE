@@ -7,7 +7,7 @@ import {
   type StaffOrder,
   type StaffOrderLine,
 } from "../../../api/staff/staff.orders";
-import { Wifi, WifiOff, StickyNote, RefreshCw } from "lucide-react";
+import { Wifi, WifiOff, StickyNote } from "lucide-react";
 
 type TabKey = "accepted" | "preparing" | "ready";
 
@@ -50,26 +50,29 @@ export default function MonitorKdsPage() {
     tabRef.current = tab;
   }, [tab]);
 
-  // paging
   const [page, setPage] = useState(1);
   const [limit] = useState(12);
 
   const [orders, setOrders] = useState<KdsOrder[]>([]);
   const [total, setTotal] = useState(0);
 
+  const [counts, setCounts] = useState<Record<TabKey, number>>({
+    accepted: 0,
+    preparing: 0,
+    ready: 0,
+  });
+
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
-  // progress timer
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  // progress store
   const lineStartRef = useRef<Record<string, number>>({});
 
   function getLinePrepMinutes(o: KdsOrder, li: StaffOrderLine) {
@@ -85,8 +88,32 @@ export default function MonitorKdsPage() {
     if (!lineStartRef.current[k]) lineStartRef.current[k] = Date.now();
   }
 
-  async function loadQueue(opts?: { silent?: boolean; resetPage?: boolean }) {
+  async function loadCounts() {
+    try {
+      const [a, p, r] = await Promise.all([
+        listStaffOrdersForMonitorApi({ status: "accepted", page: 1, limit: 1 }),
+        listStaffOrdersForMonitorApi({ status: "preparing", page: 1, limit: 1 }),
+        listStaffOrdersForMonitorApi({ status: "ready", page: 1, limit: 1 }),
+      ]);
+
+      const na = normalizeOrdersResponse(a);
+      const np = normalizeOrdersResponse(p);
+      const nr = normalizeOrdersResponse(r);
+
+      setCounts({
+        accepted: Number(na.total || 0),
+        preparing: Number(np.total || 0),
+        ready: Number(nr.total || 0),
+      });
+    } catch {
+
+    }
+  }
+
+  async function loadQueue(opts?: { silent?: boolean; resetPage?: boolean; refreshCounts?: boolean }) {
     const silent = !!opts?.silent;
+    const refreshCounts = opts?.refreshCounts ?? true;
+
     try {
       setErr(null);
       if (!silent) setLoading(true);
@@ -114,7 +141,6 @@ export default function MonitorKdsPage() {
         prepTimeMinutes: (o as any).prepTimeMinutes,
       }));
 
-      // mark started lines if status already preparing
       for (const o of mapped) {
         for (const li of o.items ?? []) {
           const lst = String(li.status || "").toLowerCase();
@@ -124,6 +150,8 @@ export default function MonitorKdsPage() {
 
       setOrders(mapped);
       setTotal(Number(t || 0));
+
+      if (refreshCounts) loadCounts();
     } catch (e: any) {
       setErr(e?.message || "Load orders failed");
     } finally {
@@ -131,19 +159,14 @@ export default function MonitorKdsPage() {
     }
   }
 
-  // initial + tab change
   useEffect(() => {
     loadQueue({ resetPage: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  // paging change
   useEffect(() => {
     loadQueue({ silent: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
-  // socket: monitor reload
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) {
@@ -166,7 +189,9 @@ export default function MonitorKdsPage() {
     const onDisconnect = () => setConnected(false);
     const onConnectError = () => setConnected(false);
 
-    const refresh = () => loadQueue({ silent: true });
+    const refresh = () => {
+      loadQueue({ silent: true, refreshCounts: true });
+    };
 
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
@@ -193,7 +218,10 @@ export default function MonitorKdsPage() {
       socketRef.current = null;
       setConnected(false);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadCounts();
   }, []);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
@@ -239,32 +267,26 @@ export default function MonitorKdsPage() {
             </div>
             <div className="mt-0.5 text-xs font-semibold text-white/60">View-only</div>
           </div>
-
-          <button
-            onClick={() => loadQueue({ resetPage: true })}
-            className="inline-flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-sm font-extrabold text-white hover:bg-white/15"
-            title="Refresh"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </button>
         </div>
 
         {/* Tabs */}
         <div className="mx-auto max-w-5xl px-2">
           <div className="flex flex-nowrap items-stretch gap-1 border-b border-slate-900 whitespace-nowrap">
             <button onClick={() => setTab("accepted")} className={tabBtnClass(tab === "accepted")}>
-              Accepted <span className={badgeClass(tab === "accepted")}>•</span>
+              Accepted{" "}
+              <span className={badgeClass(tab === "accepted")}>{counts.accepted}</span>
               <span className={underlineClass(tab === "accepted")} />
             </button>
 
             <button onClick={() => setTab("preparing")} className={tabBtnClass(tab === "preparing")}>
-              Preparing <span className={badgeClass(tab === "preparing")}>•</span>
+              Preparing{" "}
+              <span className={badgeClass(tab === "preparing")}>{counts.preparing}</span>
               <span className={underlineClass(tab === "preparing")} />
             </button>
 
             <button onClick={() => setTab("ready")} className={tabBtnClass(tab === "ready")}>
-              Send To Waiter <span className={badgeClass(tab === "ready")}>•</span>
+              Send To Waiter{" "}
+              <span className={badgeClass(tab === "ready")}>{counts.ready}</span>
               <span className={underlineClass(tab === "ready")} />
             </button>
           </div>
@@ -338,8 +360,7 @@ export default function MonitorKdsPage() {
                         const lst = String(li.status || "queued").toLowerCase();
                         const mins = getLinePrepMinutes(o, li);
 
-                        // minutes -> ms
-                        const durationMs = mins * 60_000;
+                        const durationMs = mins * 2_000;
 
                         const k = lineKey(o.orderId, li.lineId);
                         const startedAt = lineStartRef.current[k];

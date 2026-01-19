@@ -85,17 +85,16 @@ export default function MonitorWaiterLayout() {
             </span>
           </div>
 
-          {/* Monitor view: KHÔNG logout ở đây (admin app có logout riêng) */}
           <div className="text-xs font-semibold text-white/70">
             View-only
           </div>
         </div>
 
-        {/* top tabs */}
+        {/* Top tabs */}
         <div className="mx-auto max-w-3xl px-2">
           <div className="flex items-stretch gap-1 border-b border-slate-200">
             <button
-              onClick={() => navigate("/admin/monitor/waiter/orders")}
+              onClick={() => navigate("/monitor/waiter/orders")}
               className={tabBtnClass(isOrders)}
             >
               <ClipboardList className="mr-2 h-4 w-4" />
@@ -104,7 +103,7 @@ export default function MonitorWaiterLayout() {
             </button>
 
             <button
-              onClick={() => navigate("/admin/monitor/waiter/bills")}
+              onClick={() => navigate("/monitor/waiter/bills")}
               className={tabBtnClass(isBills)}
             >
               <CreditCard className="mr-2 h-4 w-4" />

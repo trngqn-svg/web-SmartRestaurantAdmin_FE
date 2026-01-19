@@ -3,23 +3,32 @@ import api from "../axios";
 export type AdminDashboardOverview = {
   today: {
     revenueCents: number;
+    revenueDeltaCents: number;
     ordersServed: number;
-    tablesServing: number;
+    ordersServedDelta: number;
+
+    occupiedTables: number;
+    totalTables: number;
+
     avgPrepTimeSeconds: number | null;
     avgPrepSampleSize: number;
-    topItems: Array<{ itemId: string; name: string; orderCount: number }>;
+
+    topItems: Array<{ itemId: string; name: string; orderCount: number; qty: number; revenueCents: number }>;
+
     recentOrders: Array<{
       orderId: string;
       tableNumber: string;
       submittedAt?: string;
       totalCents: number;
       status: string;
-      itemsCount: number;
+      itemsSummary: string;
     }>;
   };
-  week: {
-    revenueSeries: Array<{ key: string; revenueCents: number }>;
+  yesterday: {
+    revenueCents: number;
+    ordersServed: number;
   };
+  week: { revenueSeries: Array<{ key: string; revenueCents: number }> };
 };
 
 export async function getAdminDashboardOverview() {

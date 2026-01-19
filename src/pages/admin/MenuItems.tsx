@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MenuItem, ItemStatus } from "../../types/menuItem";
-import { getAdminItems, createAdminItem, updateAdminItem, deleteAdminItem } from "../../api/admin/menuItem";
+import {
+  getAdminItems,
+  createAdminItem,
+  updateAdminItem,
+  deleteAdminItem,
+} from "../../api/admin/menuItem";
 import { getAdminCategories } from "../../api/admin/menu";
 import type { MenuCategory } from "../../types/menu";
 import { ItemFormModal } from "../../components/menu/ItemFormModal";
@@ -8,31 +13,53 @@ import { fileUrl } from "../../utils/fileUrl";
 import { ItemPhotosModal } from "../../components/menu/ItemPhotosModal";
 import { ItemModifiersModal } from "../../components/menu/ItemModifiersModal";
 import { ConfirmModal } from "../../components/ConfirmModal";
-import { 
-  Search, 
-  Plus, 
-  ChevronLeft, 
-  ChevronRight, 
-  Package, 
-  Clock, 
-  Tag, 
-  ArrowUpDown, 
+import {
+  Search,
+  Plus,
+  ChevronLeft,
+  ChevronRight,
+  Package,
+  Clock,
+  Tag,
+  ArrowUpDown,
   Edit3,
   Trash2,
   Layers,
 } from "lucide-react";
+import { message } from "antd";
 
 const LIMIT_OPTIONS = [12, 24, 48];
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  available: { label: "Available", color: "bg-emerald-50 text-emerald-700 border-emerald-100", dot: "bg-emerald-500" },
-  unavailable: { label: "Unavailable", color: "bg-gray-50 text-gray-600 border-gray-100", dot: "bg-gray-400" },
-  sold_out: { label: "Sold Out", color: "bg-amber-50 text-amber-700 border-amber-100", dot: "bg-amber-500" },
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; color: string; dot: string }
+> = {
+  available: {
+    label: "Available",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    dot: "bg-emerald-500",
+  },
+  unavailable: {
+    label: "Unavailable",
+    color: "bg-gray-50 text-gray-600 border-gray-100",
+    dot: "bg-gray-400",
+  },
+  sold_out: {
+    label: "Sold Out",
+    color: "bg-amber-50 text-amber-700 border-amber-100",
+    dot: "bg-amber-500",
+  },
 };
 
 type SortKey = "createdAt" | "price" | "popularity";
 
+function errMsg(e: any, fallback: string) {
+  return e?.response?.data?.message ?? e?.message ?? fallback;
+}
+
 export default function MenuItems() {
+  const [msgApi, msgCtx] = message.useMessage();
+
   const [rows, setRows] = useState<MenuItem[]>([]);
   const [total, setTotal] = useState(0);
   const [name, setName] = useState("");
@@ -44,66 +71,119 @@ export default function MenuItems() {
   const [limit, setLimit] = useState(12);
   const [cats, setCats] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<MenuItem | null>(null);
+
   const [photosOpen, setPhotosOpen] = useState(false);
   const [photoItem, setPhotoItem] = useState<MenuItem | null>(null);
+
   const [modsOpen, setModsOpen] = useState(false);
   const [modsItemId, setModsItemId] = useState<string | null>(null);
 
-  // Logic Wrapper Functions (Preserved)
-  function openPhotos(item: MenuItem) { setPhotoItem(item); setPhotosOpen(true); }
-  function openMods(it: MenuItem) { setModsItemId(it._id); setModsOpen(true); }
-  async function closeMods() { setModsOpen(false); setModsItemId(null); await load(); }
-  const totalPages = useMemo(() => Math.max(1, Math.ceil(total / limit)), [total, limit]);
-  async function loadCats() {
-    const res = await getAdminCategories({ status: "all", sortBy: "displayOrder", sortDir: "asc", page: 1, limit: 200 });
-    const list = (res as any).items ?? (res as any);
-    setCats(Array.isArray(list) ? list : []);
+  function openPhotos(item: MenuItem) {
+    setPhotoItem(item);
+    setPhotosOpen(true);
   }
+  function openMods(it: MenuItem) {
+    setModsItemId(it._id);
+    setModsOpen(true);
+  }
+  async function closeMods() {
+    setModsOpen(false);
+    setModsItemId(null);
+    await load();
+  }
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(total / limit)),
+    [total, limit]
+  );
+
+  async function loadCats() {
+    try {
+      const res = await getAdminCategories({
+        status: "all",
+        sortBy: "displayOrder",
+        sortDir: "asc",
+        page: 1,
+        limit: 200,
+      });
+      const list = (res as any).items ?? (res as any);
+      setCats(Array.isArray(list) ? list : []);
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Failed to load categories"));
+    }
+  }
+
   async function load() {
     setLoading(true);
-    setError(null);
     try {
       const res = await getAdminItems({
         name: name.trim() ? name.trim() : undefined,
         categoryId: categoryId === "all" ? undefined : categoryId,
         status: status === "all" ? undefined : status,
-        sort, order, page, limit,
+        sort,
+        order,
+        page,
+        limit,
       });
       setRows(res.items);
       setTotal(res.total);
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Failed to load items");
-    } finally { setLoading(false); }
+      msgApi.error(errMsg(e, "Failed to load items"));
+    } finally {
+      setLoading(false);
+    }
   }
-  async function closePhotosModal() { setPhotosOpen(false); setPhotoItem(null); await load(); }
-  useEffect(() => { loadCats().catch(() => {}); }, []);
-  useEffect(() => { load(); }, [name, categoryId, status, sort, order, page, limit]);
 
-  function openCreate() { setModalMode("create"); setEditing(null); setModalOpen(true); }
-  function openEdit(item: MenuItem) { setModalMode("edit"); setEditing(item); setModalOpen(true); }
+  async function closePhotosModal() {
+    setPhotosOpen(false);
+    setPhotoItem(null);
+    await load();
+  }
+
+  useEffect(() => {
+    loadCats().catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [name, categoryId, status, sort, order, page, limit]);
+
+  function openCreate() {
+    setModalMode("create");
+    setEditing(null);
+    setModalOpen(true);
+  }
+  function openEdit(item: MenuItem) {
+    setModalMode("edit");
+    setEditing(item);
+    setModalOpen(true);
+  }
 
   async function handleSave(values: any): Promise<void> {
     setLoading(true);
     try {
-      if (modalMode === "create") { await createAdminItem(values); } 
-      else { if (!editing?._id) throw new Error("Missing item id"); await updateAdminItem(editing._id, values); }
+      if (modalMode === "create") {
+        await createAdminItem(values);
+        msgApi.success("Item created");
+      } else {
+        if (!editing?._id) throw new Error("Missing item id");
+        await updateAdminItem(editing._id, values);
+        msgApi.success("Item updated");
+      }
       setModalOpen(false);
       await load();
-    } catch (e: any) { setError(e?.response?.data?.message ?? "Save failed"); throw e; } 
-    finally { setLoading(false); }
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Save failed"));
+      throw e;
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function handleDelete(item: MenuItem) {
-    if (!confirm(`Delete "${item.name}"?`)) return;
-    try { await deleteAdminItem(item._id); await load(); } 
-    catch (e: any) { setError(e?.response?.data?.message ?? "Delete failed"); }
-  }
-
-  // Handle delete
   const [delOpen, setDelOpen] = useState(false);
   const [delItem, setDelItem] = useState<MenuItem | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -116,14 +196,14 @@ export default function MenuItems() {
   async function confirmDeleteItem() {
     if (!delItem?._id) return;
     setDeleting(true);
-    setError(null);
     try {
       await deleteAdminItem(delItem._id);
+      msgApi.success("Item deleted");
       setDelOpen(false);
       setDelItem(null);
       await load();
     } catch (e: any) {
-      setError(e?.response?.data?.message ?? "Delete failed");
+      msgApi.error(errMsg(e, "Delete failed"));
     } finally {
       setDeleting(false);
     }
@@ -131,12 +211,17 @@ export default function MenuItems() {
 
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-6 space-y-4 md:space-y-6 bg-[#FAFAFB] min-h-screen animate-in fade-in duration-700">
-      
+      {msgCtx}
+
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Menu Management</h1>
-          <p className="text-slate-500 font-medium">Manage your dishes, prices, and availability.</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Menu Management
+          </h1>
+          <p className="text-slate-500 font-medium">
+            Manage your dishes, prices, and availability.
+          </p>
         </div>
 
         <button
@@ -153,10 +238,16 @@ export default function MenuItems() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
           {/* Search */}
           <div className="md:col-span-4 relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={16}
+            />
             <input
               value={name}
-              onChange={(e) => { setPage(1); setName(e.target.value); }}
+              onChange={(e) => {
+                setPage(1);
+                setName(e.target.value);
+              }}
               className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-[#E2B13C]/20 focus:bg-white transition-all outline-none"
               placeholder="Search by name..."
             />
@@ -166,13 +257,20 @@ export default function MenuItems() {
           <div className="md:col-span-3">
             <select
               value={categoryId}
-              onChange={(e) => { setPage(1); setCategoryId(e.target.value); }}
+              onChange={(e) => {
+                setPage(1);
+                setCategoryId(e.target.value);
+              }}
               className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none cursor-pointer hover:border-slate-300 transition-colors"
             >
               <option value="all">All Categories</option>
-              {cats.filter((c) => c.status === "active").map((c) => (
-                <option key={c._id} value={c._id}>{c.name}</option>
-              ))}
+              {cats
+                .filter((c) => c.status === "active")
+                .map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -180,7 +278,10 @@ export default function MenuItems() {
           <div className="md:col-span-2">
             <select
               value={status}
-              onChange={(e) => { setPage(1); setStatus(e.target.value as any); }}
+              onChange={(e) => {
+                setPage(1);
+                setStatus(e.target.value as any);
+              }}
               className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none cursor-pointer hover:border-slate-300 transition-colors"
             >
               <option value="all">All Status</option>
@@ -195,7 +296,10 @@ export default function MenuItems() {
             <div className="relative flex-1">
               <select
                 value={sort}
-                onChange={(e) => { setPage(1); setSort(e.target.value as any); }}
+                onChange={(e) => {
+                  setPage(1);
+                  setSort(e.target.value as any);
+                }}
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none cursor-pointer hover:border-slate-300 transition-colors"
               >
                 <option value="createdAt">Date Added</option>
@@ -208,25 +312,28 @@ export default function MenuItems() {
               className="px-4 py-3 bg-slate-50 text-slate-500 border-transparent rounded-2xl hover:bg-indigo-50 hover:text-indigo-600 transition-all active:scale-90"
               title="Toggle Sort Order"
             >
-              <ArrowUpDown size={16} className={order === "asc" ? "rotate-180 transition-transform" : "transition-transform"} />
+              <ArrowUpDown
+                size={16}
+                className={
+                  order === "asc"
+                    ? "rotate-180 transition-transform"
+                    : "transition-transform"
+                }
+              />
             </button>
           </div>
         </div>
       </div>
-
-      {error && (
-        <div className="rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-600 flex items-center gap-3 animate-shake">
-          <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
-          <span className="font-semibold">{error}</span>
-        </div>
-      )}
 
       {/* Menu Items Grid */}
       <div className="min-h-[500px]">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {[...Array(limit)].map((_, i) => (
-              <div key={i} className="bg-white rounded-[32px] border border-slate-100 p-4 space-y-4">
+              <div
+                key={i}
+                className="bg-white rounded-[32px] border border-slate-100 p-4 space-y-4"
+              >
                 <div className="h-44 bg-slate-100 rounded-2xl animate-pulse" />
                 <div className="space-y-2">
                   <div className="h-5 w-2/3 bg-slate-100 rounded animate-pulse" />
@@ -244,22 +351,31 @@ export default function MenuItems() {
             <div className="p-6 bg-white rounded-3xl shadow-sm mb-6">
               <Package size={48} className="text-slate-300" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800">No menu items found</h3>
-            <p className="text-slate-500 mt-2">Try adjusting your filters or add a new item to get started.</p>
+            <h3 className="text-xl font-bold text-slate-800">
+              No menu items found
+            </h3>
+            <p className="text-slate-500 mt-2">
+              Try adjusting your filters or add a new item to get started.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {rows.map((it) => {
-              const catName = typeof it.categoryId === "object" ? it.categoryId.name : "Uncategorized";
-              const statusInfo = STATUS_CONFIG[it.status] || STATUS_CONFIG.available;
+              const catName =
+                typeof it.categoryId === "object"
+                  ? (it.categoryId as any).name
+                  : "Uncategorized";
+              const statusInfo =
+                STATUS_CONFIG[it.status] || STATUS_CONFIG.available;
 
               return (
-                /* Menu Item Card Design */
-                <div key={it._id} className="group bg-white rounded-[32px] border border-slate-200/50 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1 transition-all duration-500 flex flex-col overflow-hidden">
-                  
-                  {/* Image Section */}
+                <div
+                  key={it._id}
+                  className="group bg-white rounded-[32px] border border-slate-200/50 shadow-sm hover:shadow-2xl hover:shadow-indigo-500/10 hover:-translate-y-1 transition-all duration-500 flex flex-col overflow-hidden"
+                >
+                  {/* Image */}
                   <div className="relative h-52 w-full overflow-hidden p-3">
-                    <div 
+                    <div
                       className="relative h-full w-full overflow-hidden rounded-[24px] bg-slate-100 cursor-pointer"
                       onClick={() => openPhotos(it)}
                     >
@@ -272,21 +388,26 @@ export default function MenuItems() {
                       ) : (
                         <div className="flex h-full flex-col items-center justify-center text-slate-400 gap-2">
                           <Plus size={24} className="opacity-40" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider italic">Add Photos</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider italic">
+                            Add Photos
+                          </span>
                         </div>
                       )}
-                      
-                      {/* Availability Badge */}
+
                       <div className="absolute top-3 left-3">
-                        <span className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-black px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-md bg-white/90 ${statusInfo.color}`}>
-                          <span className={`h-1.5 w-1.5 rounded-full ${statusInfo.dot}`} />
+                        <span
+                          className={`flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-black px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-md bg-white/90 ${statusInfo.color}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${statusInfo.dot}`}
+                          />
                           {statusInfo.label}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Content Section */}
+                  {/* Content */}
                   <div className="px-6 pb-6 pt-2 flex flex-1 flex-col">
                     <div className="flex justify-between items-start mb-3">
                       <div className="space-y-1">
@@ -304,16 +425,16 @@ export default function MenuItems() {
                     </div>
 
                     <p className="flex-1 text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed font-normal">
-                      {it.description || "Freshly prepared dish with premium ingredients..."}
+                      {it.description ||
+                        "Freshly prepared dish with premium ingredients..."}
                     </p>
 
-                    {/* Minutes & Modifiers */}
                     <div className="flex items-center justify-between gap-4 mb-4 mt-auto">
                       <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-tight text-slate-400">
                         <Clock size={14} className="text-slate-300" />
                         <span>{it.prepTimeMinutes ?? 0} mins</span>
                       </div>
-                      
+
                       <button
                         onClick={() => openMods(it)}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-900 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-all active:scale-95"
@@ -323,7 +444,6 @@ export default function MenuItems() {
                       </button>
                     </div>
 
-                    {/* Edit & Delete */}
                     <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4">
                       <button
                         onClick={() => openEdit(it)}
@@ -336,7 +456,10 @@ export default function MenuItems() {
                         onClick={() => requestDelete(it)}
                         className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-rose-500 bg-rose-50/50 rounded-xl hover:bg-rose-50 transition-all active:scale-95 group/del"
                       >
-                        <Trash2 size={14} className="group-hover/del:animate-bounce" />
+                        <Trash2
+                          size={14}
+                          className="group-hover/del:animate-bounce"
+                        />
                         Delete
                       </button>
                     </div>
@@ -348,10 +471,12 @@ export default function MenuItems() {
         )}
       </div>
 
-      {/* Pagination Container */}
+      {/* Pagination */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-8 border-t border-slate-200/60">
         <p className="text-sm font-medium text-slate-500">
-          Showing <span className="text-slate-900 font-bold">{rows.length}</span> of <span className="text-slate-900 font-bold">{total}</span> items
+          Showing{" "}
+          <span className="text-slate-900 font-bold">{rows.length}</span> of{" "}
+          <span className="text-slate-900 font-bold">{total}</span> items
         </p>
 
         <div className="flex items-center gap-4">
@@ -359,11 +484,16 @@ export default function MenuItems() {
             <span>Show</span>
             <select
               value={limit}
-              onChange={(e) => { setPage(1); setLimit(Number(e.target.value)); }}
+              onChange={(e) => {
+                setPage(1);
+                setLimit(Number(e.target.value));
+              }}
               className="bg-white border border-slate-200 rounded-xl text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none py-2 px-3 transition-all cursor-pointer"
             >
               {LIMIT_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n}</option>
+                <option key={n} value={n}>
+                  {n}
+                </option>
               ))}
             </select>
           </div>
@@ -377,7 +507,9 @@ export default function MenuItems() {
               <ChevronLeft size={20} className="text-slate-600" />
             </button>
             <div className="px-5 py-2 border-x border-slate-100 text-sm font-black text-slate-700 bg-slate-50/30">
-              {page} <span className="text-slate-300 font-medium mx-1">/</span> {totalPages}
+              {page}{" "}
+              <span className="text-slate-300 font-medium mx-1">/</span>{" "}
+              {totalPages}
             </div>
             <button
               disabled={page >= totalPages}
@@ -390,7 +522,7 @@ export default function MenuItems() {
         </div>
       </div>
 
-      {/* Modals (Logic preserved) */}
+      {/* Modals */}
       <ItemFormModal
         open={modalOpen}
         mode={modalMode}
@@ -400,7 +532,11 @@ export default function MenuItems() {
         loading={loading}
         categories={cats.filter((c) => c.status === "active")}
       />
-      <ItemPhotosModal open={photosOpen} item={photoItem} onClose={closePhotosModal} />
+      <ItemPhotosModal
+        open={photosOpen}
+        item={photoItem}
+        onClose={closePhotosModal}
+      />
       <ItemModifiersModal open={modsOpen} itemId={modsItemId} onClose={closeMods} />
 
       <ConfirmModal
@@ -415,7 +551,9 @@ export default function MenuItems() {
         cancelText="Cancel"
         tone="danger"
         loading={deleting}
-        onClose={() => (!deleting ? (setDelOpen(false), setDelItem(null)) : null)}
+        onClose={() =>
+          !deleting ? (setDelOpen(false), setDelItem(null)) : null
+        }
         onConfirm={confirmDeleteItem}
       />
     </div>

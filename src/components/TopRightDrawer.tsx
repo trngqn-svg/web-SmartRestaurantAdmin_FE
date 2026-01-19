@@ -20,10 +20,10 @@ const MENU_SECTIONS = [
     title: 'Admin panel',
     items: [
       { label: 'Dashboard', to: '/dashboard' },
+      { label: 'Orders', to: '/orders' },
       { label: 'Menu Items', to: '/menu/items' },
       { label: 'Categories', to: '/menu/categories' },
       { label: 'Tables', to: '/tables' },
-      { label: 'Orders', to: '/orders' },
       { label: 'Reports', to: '/reports' },
       { label: 'Accounts', to: '/accounts' },
     ],

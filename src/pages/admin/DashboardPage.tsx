@@ -2,20 +2,31 @@ import { useEffect, useMemo, useState } from "react";
 import { message, Spin } from "antd";
 import dayjs from "dayjs";
 import {
-  LineChart,
-  Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { TrendingUp, Utensils, Timer, Table2 } from "lucide-react";
-
+import { TrendingUp, Utensils, Timer, Table2, Monitor, Plus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { getAdminDashboardOverview, type AdminDashboardOverview } from "../../api/admin/dashboard";
 import { formatMoneyFromCents, formatSecondsToMMSS } from "../../utils/reportFormat";
 
+function formatPctDelta(today: number, yesterday: number) {
+  if (yesterday <= 0) {
+    if (today <= 0) return "0%";
+    return "+100%";
+  }
+  const pct = ((today - yesterday) / yesterday) * 100;
+  const s = `${Math.abs(pct).toFixed(0)}%`;
+  return `${pct >= 0 ? "+" : "-"}${s}`;
+}
+
 export default function DashboardPage() {
+  const nav = useNavigate();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AdminDashboardOverview | null>(null);
 
@@ -40,26 +51,47 @@ export default function DashboardPage() {
     return data.week.revenueSeries.map((x) => ({
       ...x,
       revenueVnd: x.revenueCents / 100,
-      label: x.key.slice(5), // MM-DD
+      label: x.key.slice(5),
     }));
   }, [data]);
 
   const topItems = data?.today.topItems ?? [];
   const recentOrders = data?.today.recentOrders ?? [];
 
+  const prepSeconds = data?.today.avgPrepTimeSeconds ?? 0;
+
+  const revenuePct = data
+    ? formatPctDelta(data.today.revenueCents, data.yesterday.revenueCents)
+    : "0%";
+
+  const ordersPct = data
+    ? formatPctDelta(data.today.ordersServed, data.yesterday.ordersServed)
+    : "0%";
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-end justify-between">
         <div>
-          <div className="text-xl font-semibold">Admin Dashboard</div>
-          <div className="text-sm text-slate-500">Today + This week</div>
+          <div className="text-3xl font-black text-slate-900 tracking-tight">Admin Dashboard</div>
         </div>
-        <button
-          onClick={load}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
-        >
-          Refresh
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => nav("/monitor/kds")}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium hover:bg-slate-50"
+          >
+            <Monitor className="h-4.5 w-4.5" />
+            <span>Open KDS</span>
+          </button>
+
+          <button
+            onClick={() => nav("/orders")}
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm text-white font-medium hover:text-black hover:bg-[#E2B13C]"
+          >
+            <Plus className="h-4.5 w-4.5" />
+            <span>New Order</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -75,56 +107,60 @@ export default function DashboardPage() {
             <KpiCard
               title="Revenue today"
               value={formatMoneyFromCents(data.today.revenueCents)}
-              hint="Bill PAID"
+              hint={`vs yesterday: ${revenuePct}`}
               icon={<TrendingUp className="w-5 h-5" />}
+              trend={revenuePct.startsWith("+") ? "up" : revenuePct.startsWith("-") ? "down" : "flat"}
             />
+
             <KpiCard
               title="Orders served today"
               value={data.today.ordersServed.toLocaleString("vi-VN")}
-              hint="served"
+              hint={`vs yesterday: ${ordersPct}`}
               icon={<Utensils className="w-5 h-5" />}
+              trend={ordersPct.startsWith("+") ? "up" : ordersPct.startsWith("-") ? "down" : "flat"}
             />
+
             <KpiCard
-              title="Tables serving now"
-              value={data.today.tablesServing.toLocaleString("vi-VN")}
-              hint="active tables"
+              title="Tables occupied"
+              value={`${data.today.occupiedTables}/${data.today.totalTables}`}
+              hint="occupied / total"
               icon={<Table2 className="w-5 h-5" />}
             />
+
             <KpiCard
               title="Avg prep time today"
-              value={formatSecondsToMMSS(data.today.avgPrepTimeSeconds)}
+              value={formatSecondsToMMSS(prepSeconds)}
               hint={`sample: ${data.today.avgPrepSampleSize}`}
               icon={<Timer className="w-5 h-5" />}
             />
           </div>
 
-          {/* Week revenue chart */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="font-semibold">Revenue this week</div>
-            <div className="text-xs text-slate-500">Group by day (Mon–Sun)</div>
-
-            <div className="h-[280px] mt-3">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={weekRevenue}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" />
-                  <YAxis tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`} />
-                  <Tooltip
-                    labelFormatter={(l) => `Day ${l}`}
-                    formatter={(v: any) => `${Number(v).toLocaleString("vi-VN")} VND`}
-                  />
-                  <Line type="monotone" dataKey="revenueVnd" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
+          {/* Week chart + Top items same row */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+            {/* Week revenue chart (BAR) */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="font-bold font-xs text-slate-800">Revenue this week</div>
+
+              <div className="h-[280px] mt-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weekRevenue}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="label" />
+                    <YAxis tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`} />
+                    <Tooltip
+                      labelFormatter={(l) => `Day ${l}`}
+                      formatter={(v: any) => `${Number(v).toLocaleString("vi-VN")} VND`}
+                    />
+                    <Bar dataKey="revenueVnd" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             {/* Top items today */}
             <div className="rounded-2xl border border-slate-200 bg-white">
               <div className="p-4 border-b border-slate-200">
-                <div className="font-semibold">Top selling items (today)</div>
-                <div className="text-xs text-slate-500">Top 5 by number of orders containing item</div>
+                <div className="font-bold font-xs text-slate-800">Top selling items (Today)</div>
               </div>
 
               <div className="overflow-x-auto">
@@ -139,7 +175,9 @@ export default function DashboardPage() {
                   <tbody>
                     {topItems.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-4 text-slate-500" colSpan={3}>No data</td>
+                        <td className="px-4 py-4 text-slate-500" colSpan={3}>
+                          No data
+                        </td>
                       </tr>
                     ) : (
                       topItems.map((it, idx) => (
@@ -159,37 +197,57 @@ export default function DashboardPage() {
                 </table>
               </div>
             </div>
+          </div>
 
-            {/* Recent orders today */}
-            <div className="rounded-2xl border border-slate-200 bg-white">
-              <div className="p-4 border-b border-slate-200">
-                <div className="font-semibold">Recent orders (today)</div>
-                <div className="text-xs text-slate-500">Sorted by submitted time</div>
+          {/* Recent orders today */}
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <div className="font-bold font-xs text-slate-800">Recent orders (Today)</div>
               </div>
+              <button
+                onClick={() => nav("/orders")}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium hover:bg-slate-50"
+              >
+                View All Orders
+              </button>
+            </div>
 
-              <div className="divide-y divide-slate-100">
-                {recentOrders.length === 0 ? (
-                  <div className="p-4 text-sm text-slate-500">No orders</div>
-                ) : (
-                  recentOrders.map((o) => (
-                    <div key={o.orderId} className="p-4 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium">
-                          Table {o.tableNumber} <span className="text-slate-400">•</span>{" "}
-                          <span className="text-slate-600">{o.status}</span>
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {o.submittedAt ? dayjs(o.submittedAt).format("HH:mm:ss") : "—"} • {o.itemsCount} items
-                        </div>
-                        <div className="text-xs text-slate-400">{o.orderId}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold">{formatMoneyFromCents(o.totalCents)}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="text-left font-medium px-4 py-3 w-[220px]">Order ID</th>
+                    <th className="text-left font-medium px-4 py-3 w-[90px]">Table</th>
+                    <th className="text-left font-medium px-4 py-3">Items</th>
+                    <th className="text-right font-medium px-4 py-3 w-[140px]">Total</th>
+                    <th className="text-left font-medium px-4 py-3 w-[140px]">Status</th>
+                    <th className="text-right font-medium px-4 py-3 w-[110px]">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-4 text-slate-500" colSpan={6}>
+                        No orders
+                      </td>
+                    </tr>
+                  ) : (
+                    recentOrders.map((o) => (
+                      <tr key={o.orderId} className="border-t border-slate-100">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{o.orderId}</td>
+                        <td className="px-4 py-3">#{o.tableNumber}</td>
+                        <td className="px-4 py-3 text-slate-700">{o.itemsSummary}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{formatMoneyFromCents(o.totalCents)}</td>
+                        <td className="px-4 py-3">{o.status}</td>
+                        <td className="px-4 py-3 text-right">
+                          {o.submittedAt ? dayjs(o.submittedAt).format("HH:mm") : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </>
@@ -198,19 +256,30 @@ export default function DashboardPage() {
   );
 }
 
-function KpiCard(props: { title: string; value: string; hint?: string; icon?: React.ReactNode }) {
+function KpiCard(props: {
+  title: string;
+  value: string;
+  hint?: string;
+  icon?: React.ReactNode;
+  trend?: "up" | "down" | "flat";
+}) {
+  const trendCls =
+    props.trend === "up"
+      ? "text-emerald-600"
+      : props.trend === "down"
+      ? "text-rose-600"
+      : "text-slate-500";
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">{props.title}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">{props.title}</div>
           <div className="mt-1 text-2xl font-semibold text-slate-900">{props.value}</div>
-          {props.hint ? <div className="mt-1 text-xs text-slate-500">{props.hint}</div> : null}
+          {props.hint ? <div className={`mt-1 text-xs ${trendCls}`}>{props.hint}</div> : null}
         </div>
         {props.icon ? (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700">
-            {props.icon}
-          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-2 text-slate-700">{props.icon}</div>
         ) : null}
       </div>
     </div>
