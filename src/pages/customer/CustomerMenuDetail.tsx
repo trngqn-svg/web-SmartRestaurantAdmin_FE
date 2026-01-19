@@ -57,14 +57,11 @@ export default function CustomerMenuDetail() {
 
   const from = (location.state as any)?.from as string | undefined;
 
-  // 1) Load menu only when no stateItem (để tìm item + related)
   useEffect(() => {
     let mounted = true;
 
-    // loading item: nếu có stateItem thì item đã có sẵn
     setLoading(!stateItem);
 
-    // luôn fetch menuData để có related items
     getCustomerMenu({ page: 1, limit: 200, sort: "createdAt" })
       .then((res) => {
         if (!mounted) return;
@@ -72,7 +69,6 @@ export default function CustomerMenuDetail() {
       })
       .finally(() => {
         if (!mounted) return;
-        // nếu không có stateItem thì chờ fetch xong mới hết loading
         if (!stateItem) setLoading(false);
       });
 
@@ -81,7 +77,6 @@ export default function CustomerMenuDetail() {
     };
   }, [stateItem]);
 
-  // 2) Load reviews by item id
   useEffect(() => {
     if (!id) return;
     let mounted = true;
@@ -102,7 +97,6 @@ export default function CustomerMenuDetail() {
     };
   }, [id]);
 
-  // 3) Resolve item
   const item = useMemo<MenuItemDTO | null>(() => {
     if (!id) return null;
     if (stateItem) return stateItem;
@@ -110,7 +104,6 @@ export default function CustomerMenuDetail() {
     return (list.find((x) => String(x?.id) === String(id)) as any) ?? null;
   }, [id, stateItem, menuData]);
 
-  // 4) Init modifier selection defaults (không đặt hook sau return)
   useEffect(() => {
     if (!item) return;
 

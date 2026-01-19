@@ -41,10 +41,10 @@ export default function Sidebar() {
   const username = localStorage.getItem('username') || 'admin';
 
   return (
-    <aside className="hidden md:flex w-64 bg-[#1A2F2F] flex-col h-screen sticky top-0 border-r border-white/5 shadow-xl">
+    <aside className="hidden md:flex w-64 bg-slate-900 flex-col h-screen sticky top-0 border-r border-white/5 shadow-xl">
       
       {/* Top Section: Integrated Logo & Branding */}
-      <div className="h-24 flex flex-col justify-center px-6 border-b border-white/10 bg-[#162828]">
+      <div className="h-24 flex flex-col justify-center px-6 border-b border-white/10 bg-slate-900">
         <div className="flex items-end gap-1 leading-none">
           {/* Stylized Logo Icon from Image */}
           <div className="relative flex items-center justify-center">
@@ -64,10 +64,10 @@ export default function Sidebar() {
       {/* Navigation Menu */}
       <nav className="flex-1 mt-6">
         <SidebarLink to="/dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
+        <SidebarLink to="/orders" icon={<ReceiptText size={20} />} label="Orders" />
         <SidebarLink to="/menu/items" icon={<Utensils size={20} />} label="Menu Items" />
         <SidebarLink to="/menu/categories" icon={<Layers size={20} />} label="Categories" />
         <SidebarLink to="/tables" icon={<Grid2X2 size={20} />} label="Tables" />
-        <SidebarLink to="/orders" icon={<ReceiptText size={20} />} label="Orders" />
         <SidebarLink to="/reports" icon={<ChartColumn size={20} />} label="Reports" />
         <SidebarLink to="/accounts" icon={<User size={20} />} label="Accounts" />
       </nav>

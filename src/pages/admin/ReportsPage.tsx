@@ -28,7 +28,6 @@ function toYYYYMMDD(d: Dayjs) {
 }
 
 function downloadViaAxios(url: string, filename: string) {
-  // nếu axios baseURL set sẵn thì url chỉ là path
   return api
     .get(url, { responseType: "blob" })
     .then((res) => {
@@ -47,9 +46,21 @@ function downloadViaAxios(url: string, filename: string) {
     });
 }
 
+function fmtDeltaPct(v?: number) {
+  if (v == null || !Number.isFinite(v)) return "0%";
+  const n = Math.round(v);
+  const s = `${Math.abs(n)}%`;
+  return `${n >= 0 ? "+" : "-"}${s}`;
+}
+
+function trendClass(v?: number) {
+  if (v == null || !Number.isFinite(v) || v === 0) return "text-slate-500";
+  return v > 0 ? "text-emerald-600" : "text-rose-600";
+}
+
 export default function ReportsPage() {
   const [range, setRange] = useState<ReportRange>("week");
-  const [anchor, setAnchor] = useState<Dayjs>(() => dayjs()); // default today
+  const [anchor, setAnchor] = useState<Dayjs>(() => dayjs());
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportOverview | null>(null);
 
@@ -69,12 +80,10 @@ export default function ReportsPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [range, anchorDate]);
 
   const revenueSeries = useMemo(() => {
     if (!data) return [];
-    // key is YYYY-MM-DD (week) or YYYY-W##
     return data.revenueSeries.map((x) => ({
       ...x,
       revenueVnd: x.revenueCents / 100,
@@ -89,11 +98,7 @@ export default function ReportsPage() {
   const topItems = data?.topItems ?? [];
 
   const revenueLabel = (key: string) => {
-    if (range === "week") {
-      // show MM-DD
-      return key.slice(5);
-    }
-    // month: YYYY-W##
+    if (range === "week") return key.slice(5);
     const m = key.match(/W(\d+)/);
     return m ? `W${m[1]}` : key;
   };
@@ -101,15 +106,17 @@ export default function ReportsPage() {
   const subtitle = useMemo(() => {
     if (!data) return "";
     const from = dayjs(data.from).format("DD/MM/YYYY");
-    const to = dayjs(data.to).subtract(1, "day").format("DD/MM/YYYY"); // because backend uses [from,to)
+    const to = dayjs(data.to).subtract(1, "day").format("DD/MM/YYYY");
     return `${from} → ${to}`;
   }, [data]);
+
+  const compareLabel = range === "week" ? "vs last week" : "vs last month";
 
   const onExportCsv = async () => {
     try {
       const url = buildReportExportUrl({ type: "csv", range, anchorDate });
       await downloadViaAxios(url, `report-${range}-${anchorDate}.csv`);
-      message.success("Export CSV thành công");
+      message.success("Export CSV succeeded");
     } catch (e: any) {
       message.error(e?.message || "Export CSV failed");
     }
@@ -119,17 +126,20 @@ export default function ReportsPage() {
     try {
       const url = buildReportExportUrl({ type: "pdf", range, anchorDate });
       await downloadViaAxios(url, `report-${range}-${anchorDate}.pdf`);
-      message.success("Export PDF thành công");
+      message.success("Export PDF succeeded");
     } catch (e: any) {
       message.error(e?.message || "Export PDF failed");
     }
   };
 
+  const totals = data?.totals;
+  const avgPrepSeconds = totals?.avgPrepTimeSeconds ?? 0;
+
   return (
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1">
-          <div className="text-xl font-semibold tracking-tight">Reports</div>
+          <div className="text-3xl font-black text-slate-900 tracking-tight">Reports</div>
           <div className="text-sm text-slate-500 flex items-center gap-2">
             <CalendarDays className="w-4 h-4" />
             <span>{subtitle || "—"}</span>
@@ -177,7 +187,7 @@ export default function ReportsPage() {
         </div>
       ) : !data ? (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-600">
-          Không có dữ liệu.
+          No data.
         </div>
       ) : (
         <>
@@ -185,24 +195,30 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
             <KpiCard
               title="Total revenue"
-              value={formatMoneyFromCents(data.totals.revenueCents)}
-              hint="Bill PAID"
+              value={formatMoneyFromCents(totals!.revenueCents)}
+              hint={`${compareLabel}: ${fmtDeltaPct((totals as any).revenueDeltaPct)}`}
+              hintClass={trendClass((totals as any).revenueDeltaPct)}
               icon={<TrendingUp className="w-5 h-5" />}
             />
+
             <KpiCard
               title="Total orders"
-              value={data.totals.ordersServed.toLocaleString("vi-VN")}
-              hint="served"
+              value={totals!.ordersServed.toLocaleString("vi-VN")}
+              hint={`${compareLabel}: ${fmtDeltaPct((totals as any).ordersDeltaPct)}`}
+              hintClass={trendClass((totals as any).ordersDeltaPct)}
             />
+
             <KpiCard
               title="Avg order value"
-              value={formatMoneyFromCents(data.totals.avgOrderValueCents)}
-              hint="served"
+              value={formatMoneyFromCents(totals!.avgOrderValueCents)}
+              hint={`${compareLabel}: ${fmtDeltaPct((totals as any).aovDeltaPct)}`}
+              hintClass={trendClass((totals as any).aovDeltaPct)}
             />
+
             <KpiCard
               title="Avg prep time"
-              value={formatSecondsToMMSS(data.totals.avgPrepTimeSeconds)}
-              hint={`sample: ${data.totals.avgPrepSampleSize}`}
+              value={formatSecondsToMMSS(avgPrepSeconds)}
+              hint={`sample: ${totals!.avgPrepSampleSize}`}
             />
           </div>
 
@@ -211,7 +227,7 @@ export default function ReportsPage() {
             <div className="xl:col-span-2 rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold">Revenue over time</div>
+                  <div className="font-bold text-lg">Revenue over time</div>
                   <div className="text-xs text-slate-500">
                     {range === "week" ? "Group by day" : "Group by ISO week in month"}
                   </div>
@@ -222,28 +238,13 @@ export default function ReportsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={revenueSeries}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="key"
-                      tickFormatter={revenueLabel}
-                      minTickGap={16}
-                    />
-                    <YAxis
-                      tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`}
-                    />
+                    <XAxis dataKey="key" tickFormatter={revenueLabel} minTickGap={16} />
+                    <YAxis tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`} />
                     <Tooltip
-                      formatter={(v: any) =>
-                        `${Number(v).toLocaleString("vi-VN")} VND`
-                      }
-                      labelFormatter={(l) =>
-                        range === "week" ? l : `ISO ${l}`
-                      }
+                      formatter={(v: any) => `${Number(v).toLocaleString("vi-VN")} VND`}
+                      labelFormatter={(l) => (range === "week" ? l : `ISO ${l}`)}
                     />
-                    <Line
-                      type="monotone"
-                      dataKey="revenueVnd"
-                      strokeWidth={2}
-                      dot={false}
-                    />
+                    <Line type="monotone" dataKey="revenueVnd" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
@@ -251,8 +252,8 @@ export default function ReportsPage() {
 
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <div>
-                <div className="font-semibold">Peak hours</div>
-                <div className="text-xs text-slate-500">By served orders (submittedAt)</div>
+                <div className="font-bold text-l">Peak hours</div>
+                <div className="text-xs text-slate-500">Orders by hour</div>
               </div>
 
               <div className="h-[280px] mt-3">
@@ -276,7 +277,6 @@ export default function ReportsPage() {
           <div className="rounded-2xl border border-slate-200 bg-white">
             <div className="p-4 border-b border-slate-200">
               <div className="font-semibold">Top selling items</div>
-              <div className="text-xs text-slate-500">Top 5 by total quantity (served orders)</div>
             </div>
 
             <div className="overflow-x-auto">
@@ -285,29 +285,44 @@ export default function ReportsPage() {
                   <tr>
                     <th className="text-left font-medium px-4 py-3 w-[70px]">#</th>
                     <th className="text-left font-medium px-4 py-3">Item</th>
-                    <th className="text-right font-medium px-4 py-3 w-[140px]">Total qty</th>
+                    <th className="text-right font-medium px-4 py-3 w-[120px]">Qty</th>
+                    <th className="text-right font-medium px-4 py-3 w-[160px]">Revenue</th>
+                    <th className="text-right font-medium px-4 py-3 w-[110px]">Trend</th>
                   </tr>
                 </thead>
                 <tbody>
                   {topItems.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-4 text-slate-500" colSpan={3}>
+                      <td className="px-4 py-4 text-slate-500" colSpan={5}>
                         No data
                       </td>
                     </tr>
                   ) : (
-                    topItems.map((it, idx) => (
-                      <tr key={it.itemId} className="border-t border-slate-100">
-                        <td className="px-4 py-3 text-slate-500">{idx + 1}</td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{it.name}</div>
-                          <div className="text-xs text-slate-500">{it.itemId}</div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold">
-                          {it.totalQty.toLocaleString("vi-VN")}
-                        </td>
-                      </tr>
-                    ))
+                    topItems.map((it: any, idx: number) => {
+                      const trend = Number(it.trendPct ?? 0);
+                      const trendText = `${trend >= 0 ? "+" : "-"}${Math.abs(Math.round(trend))}%`;
+                      const tCls = trendClass(trend);
+
+                      return (
+                        <tr key={it.itemId} className="border-t border-slate-100">
+                          <td className="px-4 py-3 text-slate-500">{idx + 1}</td>
+
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-slate-900">{it.name}</div>
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            {Number(it.totalQty ?? 0).toLocaleString("vi-VN")}
+                          </td>
+
+                          <td className="px-4 py-3 text-right font-semibold">
+                            {formatMoneyFromCents(Number(it.revenueCents ?? 0))}
+                          </td>
+
+                          <td className={`px-4 py-3 text-right font-semibold ${tCls}`}>{trendText}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -323,16 +338,17 @@ function KpiCard(props: {
   title: string;
   value: string;
   hint?: string;
+  hintClass?: string;
   icon?: React.ReactNode;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-wider text-slate-500">{props.title}</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500">{props.title}</div>
           <div className="mt-1 text-2xl font-semibold text-slate-900">{props.value}</div>
           {props.hint ? (
-            <div className="mt-1 text-xs text-slate-500">{props.hint}</div>
+            <div className={`mt-1 text-xs ${props.hintClass ?? "text-slate-500"}`}>{props.hint}</div>
           ) : null}
         </div>
         {props.icon ? (

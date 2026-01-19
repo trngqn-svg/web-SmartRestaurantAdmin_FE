@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { message } from "antd";
+import { useForm } from "react-hook-form";
 import {
   createAccount,
   disableAccount,
@@ -12,16 +14,9 @@ function cn(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
-type TabKey = Exclude<Role, "SUPER_ADMIN">; // chỉ dùng cho tab UI
+type TabKey = Exclude<Role, "SUPER_ADMIN">;
 
-type FormState = {
-  open: boolean;
-  mode: "create" | "edit";
-  role: Role;
-  editing?: Account | null;
-  username: string;
-  password: string;
-};
+type FormMode = "create" | "edit";
 
 const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -85,9 +80,7 @@ function Section({
     <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <div>
-          <div className="text-lg font-semibold text-slate-900">
-            {ROLE_LABEL[role]}
-          </div>
+          <div className="text-lg font-semibold text-slate-900">{ROLE_LABEL[role]}</div>
           <div className="text-sm text-slate-500">
             List of {ROLE_LABEL[role].toLowerCase()} accounts
           </div>
@@ -123,9 +116,7 @@ function Section({
                 className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-900">
-                    {acc.username}
-                  </div>
+                  <div className="truncate text-sm font-semibold text-slate-900">{acc.username}</div>
                   <div className="mt-0.5 text-xs text-slate-500">
                     Role: {acc.role}
                     {acc.status ? ` • Status: ${acc.status}` : ""}
@@ -180,6 +171,16 @@ function getMyRoleFromAccessToken(): string | null {
   }
 }
 
+type AccountFormValues = {
+  username: string;
+  password: string;
+  confirmPassword: string;
+};
+
+function serverMsg(e: any) {
+  return e?.response?.data?.message || e?.message || "Request failed";
+}
+
 export default function AccountsPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("ADMIN");
 
@@ -194,15 +195,18 @@ export default function AccountsPage() {
     KDS: false,
   });
 
-  const [error, setError] = useState<string | null>(null);
-
-  const [form, setForm] = useState<FormState>({
+  const [formState, setFormState] = useState<{
+    open: boolean;
+    mode: FormMode;
+    role: TabKey;
+    editing: Account | null;
+    submitting: boolean;
+  }>({
     open: false,
     mode: "create",
     role: "ADMIN",
     editing: null,
-    username: "",
-    password: "",
+    submitting: false,
   });
 
   const [disableConfirm, setDisableConfirm] = useState<{
@@ -210,11 +214,6 @@ export default function AccountsPage() {
     acc: Account | null;
     submitting: boolean;
   }>({ open: false, acc: null, submitting: false });
-
-  const [fieldErrors, setFieldErrors] = useState<{
-    username?: string;
-    password?: string;
-  }>({});
 
   const canManageAdmin = myRole === "SUPER_ADMIN";
   const canManageThisTab = activeTab !== "ADMIN" || canManageAdmin;
@@ -225,8 +224,26 @@ export default function AccountsPage() {
     return kds;
   }, [activeTab, admins, waiters, kds]);
 
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    formState: { errors },
+    setError,
+    clearErrors,
+  } = useForm<AccountFormValues>({
+    defaultValues: {
+      username: "",
+      password: "",
+      confirmPassword: "",
+    },
+    mode: "onSubmit",
+  });
+
+  const watchedPassword = watch("password");
+
   async function loadRole(role: TabKey) {
-    setError(null);
     setLoading((s) => ({ ...s, [role]: true }));
     try {
       const res = await listAccounts({ role, page: 1, limit: 200 });
@@ -235,7 +252,7 @@ export default function AccountsPage() {
       if (role === "WAITER") setWaiters(items);
       if (role === "KDS") setKds(items);
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Load failed");
+      message.error(serverMsg(e));
     } finally {
       setLoading((s) => ({ ...s, [role]: false }));
     }
@@ -251,45 +268,56 @@ export default function AccountsPage() {
 
   useEffect(() => {
     loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function openCreate(role: TabKey) {
     if (role === "ADMIN" && !canManageAdmin) return;
-    setFieldErrors({});
-    setForm({
+
+    setFormState({
       open: true,
       mode: "create",
       role,
       editing: null,
+      submitting: false,
+    });
+
+    reset({
       username: "",
       password: "",
+      confirmPassword: "",
     });
+    clearErrors();
   }
 
   function openEdit(acc: Account) {
     if (acc.role === "ADMIN" && !canManageAdmin) return;
-    setFieldErrors({});
-    setForm({
+
+    setFormState({
       open: true,
       mode: "edit",
-      role: acc.role,
+      role: acc.role as TabKey,
       editing: acc,
-      username: acc.username,
-      password: "",
+      submitting: false,
     });
+
+    reset({
+      username: acc.username ?? "",
+      password: "",
+      confirmPassword: "",
+    });
+    clearErrors();
   }
 
   async function onToggleStatus(acc: Account) {
     if (acc.role === "ADMIN" && !canManageAdmin) return;
 
     if (acc.status === "DISABLED") {
-      setError(null);
       try {
         await enableAccount(acc._id);
+        message.success("Enabled");
         await loadRole(acc.role as TabKey);
       } catch (e: any) {
-        setError(e?.response?.data?.message || e?.message || "Enable failed");
+        message.error(serverMsg(e));
       }
       return;
     }
@@ -300,89 +328,99 @@ export default function AccountsPage() {
   async function submitDisable() {
     const acc = disableConfirm.acc;
     if (!acc) return;
-
     if (acc.role === "ADMIN" && !canManageAdmin) return;
 
     setDisableConfirm((s) => ({ ...s, submitting: true }));
-    setError(null);
-
     try {
       await disableAccount(acc._id);
+      message.success("Disabled");
       setDisableConfirm({ open: false, acc: null, submitting: false });
       await loadRole(acc.role as TabKey);
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Disable failed");
+      message.error(serverMsg(e));
       setDisableConfirm((s) => ({ ...s, submitting: false }));
     }
   }
 
-  async function onSubmitForm() {
-    setError(null);
-    setFieldErrors({});
+  const onSubmit = handleSubmit(async (vals) => {
+    const username = vals.username.trim();
+    const password = vals.password;
+    const confirmPassword = vals.confirmPassword;
 
-    const username = form.username.trim();
-    const password = form.password;
     const MIN_PW = 6;
 
-    let hasError = false;
-
     if (!username) {
-      setFieldErrors((e) => ({ ...e, username: "Username không được trống" }));
-      hasError = true;
+      setError("username", { type: "manual", message: "Username không được trống" });
+      return;
     }
 
-    if (form.mode === "create") {
+    if (formState.mode === "create") {
       if (!password) {
-        setFieldErrors((e) => ({ ...e, password: "Password không được trống" }));
-        hasError = true;
-      } else if (password.length < MIN_PW) {
-        setFieldErrors((e) => ({
-          ...e,
-          password: `Password phải có ít nhất ${MIN_PW} ký tự`,
-        }));
-        hasError = true;
+        setError("password", { type: "manual", message: "Password không được trống" });
+        return;
+      }
+      if (password.length < MIN_PW) {
+        setError("password", { type: "manual", message: `Password phải có ít nhất ${MIN_PW} ký tự` });
+        return;
+      }
+      if (!confirmPassword) {
+        setError("confirmPassword", { type: "manual", message: "Confirm password không được trống" });
+        return;
+      }
+      if (confirmPassword !== password) {
+        setError("confirmPassword", { type: "manual", message: "Confirm password không khớp" });
+        return;
       }
     }
 
-    if (form.mode === "edit" && password && password.length < MIN_PW) {
-      setFieldErrors((e) => ({
-        ...e,
-        password: `Password phải có ít nhất ${MIN_PW} ký tự`,
-      }));
-      hasError = true;
+    if (formState.mode === "edit" && password) {
+      if (password.length < MIN_PW) {
+        setError("password", { type: "manual", message: `Password phải có ít nhất ${MIN_PW} ký tự` });
+        return;
+      }
+      if (!confirmPassword) {
+        setError("confirmPassword", { type: "manual", message: "Confirm password không được trống" });
+        return;
+      }
+      if (confirmPassword !== password) {
+        setError("confirmPassword", { type: "manual", message: "Confirm password không khớp" });
+        return;
+      }
     }
 
-    if (hasError) return;
-
     try {
-      if (form.mode === "create") {
-        await createAccount({ username, password, role: form.role });
-        setForm((s) => ({ ...s, open: false }));
-        await loadRole(form.role as TabKey);
+      setFormState((s) => ({ ...s, submitting: true }));
+
+      if (formState.mode === "create") {
+        await createAccount({ username, password, role: formState.role });
+        message.success("Created account");
+        setFormState((s) => ({ ...s, open: false, submitting: false }));
+        await loadRole(formState.role);
       } else {
-        if (!form.editing?._id) return;
-        await updateAccount(form.editing._id, {
+        const id = formState.editing?._id;
+        if (!id) return;
+
+        await updateAccount(id, {
           username,
           ...(password ? { password } : {}),
         });
-        setForm((s) => ({ ...s, open: false }));
-        await loadRole(form.role as TabKey);
+
+        message.success("Updated account");
+        setFormState((s) => ({ ...s, open: false, submitting: false }));
+        await loadRole(formState.role);
       }
     } catch (e: any) {
-      setError(e?.response?.data?.message || e?.message || "Save failed");
+      message.error(serverMsg(e));
+      setFormState((s) => ({ ...s, submitting: false }));
     }
-  }
+  });
 
   return (
     <div className="mx-auto w-full max-w-6xl p-4 md:p-6">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="text-2xl font-bold text-slate-900">
-            Accounts Management
-          </div>
-          <div className="mt-1 text-sm text-slate-600">
-            Manage Admin / Waiter / KDS
-          </div>
+          <div className="text-3xl font-black text-slate-900 tracking-tight">Accounts Management</div>
+          <div className="mt-1 text-sm text-slate-600">Manage Admin / Waiter / KDS</div>
         </div>
 
         <div className="flex gap-2 rounded-2xl border border-slate-200 bg-white p-1">
@@ -395,9 +433,7 @@ export default function AccountsPage() {
                 onClick={() => setActiveTab(r)}
                 className={cn(
                   "rounded-2xl px-4 py-2 text-sm font-semibold transition",
-                  active
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-700 hover:bg-slate-100"
+                  active ? "bg-slate-900 text-white" : "text-slate-700 hover:bg-slate-100"
                 )}
               >
                 {ROLE_LABEL[r]}
@@ -406,12 +442,6 @@ export default function AccountsPage() {
           })}
         </div>
       </div>
-
-      {error && (
-        <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      )}
 
       <Section
         role={activeTab}
@@ -426,97 +456,132 @@ export default function AccountsPage() {
 
       {/* Create/Edit Modal */}
       <Modal
-        open={form.open}
+        open={formState.open}
         title={
-          form.mode === "create"
-            ? `Tạo tài khoản ${ROLE_LABEL[form.role]}`
-            : `Sửa tài khoản ${ROLE_LABEL[form.role]}`
+          formState.mode === "create"
+            ? `Add new account ${ROLE_LABEL[formState.role]}`
+            : `Edit account ${ROLE_LABEL[formState.role]}`
         }
         onClose={() => {
-          setForm((s) => ({ ...s, open: false }));
-          setFieldErrors({});
+          if (formState.submitting) return;
+          setFormState((s) => ({ ...s, open: false }));
+          reset({ username: "", password: "", confirmPassword: "" });
+          clearErrors();
         }}
       >
-        <div className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Username
-            </label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Username</label>
             <input
-              value={form.username}
+              {...register("username", {
+                required: "Username is required",
+                setValueAs: (v) => (typeof v === "string" ? v.trimStart() : v),
+              })}
               onChange={(e) => {
-                const v = e.target.value;
-                setForm((s) => ({ ...s, username: v }));
-                if (fieldErrors.username) {
-                  setFieldErrors((er) => ({ ...er, username: undefined }));
-                }
+                register("username").onChange(e);
+                if (errors.username) clearErrors("username");
               }}
               className={cn(
                 "w-full rounded-xl border bg-slate-50/50 px-4 py-2.5 text-sm outline-none",
-                fieldErrors.username
-                  ? "border-rose-500 focus:border-rose-500"
-                  : "border-slate-200 focus:border-slate-400"
+                errors.username ? "border-rose-500 focus:border-rose-500" : "border-slate-200 focus:border-slate-400"
               )}
-              placeholder="vd: waiter01"
+              placeholder="Enter username"
+              disabled={formState.submitting}
             />
-            {fieldErrors.username && (
-              <p className="mt-1 text-xs text-rose-600">
-                {fieldErrors.username}
-              </p>
-            )}
+            {errors.username?.message && <p className="mt-1 text-xs text-rose-600">{errors.username.message}</p>}
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
-              Password {form.mode === "edit" ? "(để trống nếu không đổi)" : ""}
+              Password {formState.mode === "edit" ? "(Leave blank if no change)" : ""}
             </label>
             <input
               type="password"
-              value={form.password}
+              {...register("password", {
+                validate: (v) => {
+                  const MIN_PW = 6;
+                  if (formState.mode === "create") {
+                    if (!v) return "Password is required";
+                    if (v.length < MIN_PW) return `Password must have at least ${MIN_PW} characters.`;
+                  }
+                  if (formState.mode === "edit" && v && v.length < MIN_PW) {
+                    return `Password must have at least ${MIN_PW} characters.`;
+                  }
+                  return true;
+                },
+              })}
               onChange={(e) => {
-                const v = e.target.value;
-                setForm((s) => ({ ...s, password: v }));
-                if (fieldErrors.password) {
-                  setFieldErrors((er) => ({ ...er, password: undefined }));
-                }
+                register("password").onChange(e);
+                if (errors.password) clearErrors("password");
               }}
               className={cn(
                 "w-full rounded-xl border bg-slate-50/50 px-4 py-2.5 text-sm outline-none",
-                fieldErrors.password
+                errors.password ? "border-rose-500 focus:border-rose-500" : "border-slate-200 focus:border-slate-400"
+              )}
+              placeholder={formState.mode === "create" ? "Enter password" : "••••••"}
+              disabled={formState.submitting}
+            />
+            {errors.password?.message && <p className="mt-1 text-xs text-rose-600">{errors.password.message}</p>}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Confirm password</label>
+            <input
+              type="password"
+              {...register("confirmPassword", {
+                validate: (v) => {
+                  const pw = watchedPassword ?? "";
+                  if (formState.mode === "create") {
+                    if (!v) return "Confirm password is required";
+                    if (v !== pw) return "Confirm password and password are not matched.";
+                  }
+                  if (formState.mode === "edit" && pw) {
+                    if (!v) return "Confirm password is required";
+                    if (v !== pw) return "Confirm password and password are not matched.";
+                  }
+                  return true;
+                },
+              })}
+              onChange={(e) => {
+                register("confirmPassword").onChange(e);
+                if (errors.confirmPassword) clearErrors("confirmPassword");
+              }}
+              className={cn(
+                "w-full rounded-xl border bg-slate-50/50 px-4 py-2.5 text-sm outline-none",
+                errors.confirmPassword
                   ? "border-rose-500 focus:border-rose-500"
                   : "border-slate-200 focus:border-slate-400"
               )}
-              placeholder={
-                form.mode === "create" ? "tối thiểu 6 ký tự" : "••••••"
-              }
+              placeholder="Confirm password"
+              disabled={formState.submitting}
             />
-            {fieldErrors.password && (
-              <p className="mt-1 text-xs text-rose-600">
-                {fieldErrors.password}
-              </p>
+            {errors.confirmPassword?.message && (
+              <p className="mt-1 text-xs text-rose-600">{errors.confirmPassword.message}</p>
             )}
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
+              disabled={formState.submitting}
               onClick={() => {
-                setForm((s) => ({ ...s, open: false }));
-                setFieldErrors({});
+                setFormState((s) => ({ ...s, open: false }));
+                reset({ username: "", password: "", confirmPassword: "" });
+                clearErrors();
               }}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
-              Hủy
+              Cancel
             </button>
             <button
-              type="button"
-              onClick={onSubmitForm}
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+              type="submit"
+              disabled={formState.submitting}
+              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
             >
-              {form.mode === "create" ? "Tạo" : "Lưu"}
+              {formState.submitting ? "Saving..." : formState.mode === "create" ? "Create" : "Save"}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
 
       {/* Disable confirm Modal */}
@@ -536,9 +601,7 @@ export default function AccountsPage() {
           className="space-y-4"
         >
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-            Disable account{" "}
-            <span className="font-semibold">{disableConfirm.acc?.username}</span>
-            ?
+            Disable account <span className="font-semibold">{disableConfirm.acc?.username}</span>?
             <div className="mt-1 text-xs text-slate-500">
               Account will not be able to login until enabled.
             </div>
@@ -548,9 +611,7 @@ export default function AccountsPage() {
             <button
               type="button"
               disabled={disableConfirm.submitting}
-              onClick={() =>
-                setDisableConfirm({ open: false, acc: null, submitting: false })
-              }
+              onClick={() => setDisableConfirm({ open: false, acc: null, submitting: false })}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
               Cancel

@@ -34,8 +34,8 @@ export default function CustomerBillPage() {
     requestedAt: new Date().toISOString(),
     paidAt: null,
     servedLines: [
-      { key: "o_a9:l1", name: "Red Wine", qty: 1, lineTotalCents: 800 },      // 8.00$
-      { key: "o_a9:l2", name: "Grilled Salmon", qty: 1, lineTotalCents: 2450 }, // 24.50$
+      { key: "o_a9:l1", name: "Red Wine", qty: 1, lineTotalCents: 800 },
+      { key: "o_a9:l2", name: "Grilled Salmon", qty: 1, lineTotalCents: 2450 },
     ],
   }));
 

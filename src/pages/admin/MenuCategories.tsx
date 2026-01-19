@@ -9,7 +9,7 @@ import {
   ChevronRight,
   Filter,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { message } from "antd";
 import {
   createAdminCategory,
   getAdminCategories,
@@ -22,7 +22,13 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 
 const LIMIT_OPTIONS = [10, 20, 50];
 
+function errMsg(e: any, fallback: string) {
+  return e?.response?.data?.message ?? e?.message ?? fallback;
+}
+
 export default function MenuCategories() {
+  const [msgApi, msgCtx] = message.useMessage();
+
   const [rows, setRows] = useState<MenuCategory[]>([]);
   const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
@@ -38,7 +44,10 @@ export default function MenuCategories() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [editing, setEditing] = useState<MenuCategory | null>(null);
-  const [formError, setFormError] = useState<{ field?: "name"; message: string } | null>(null);
+  const [formError, setFormError] = useState<{
+    field?: "name";
+    message: string;
+  } | null>(null);
 
   const reqIdRef = useRef(0);
 
@@ -66,7 +75,7 @@ export default function MenuCategories() {
       setTotal(res.total);
     } catch (e: any) {
       if (reqId !== reqIdRef.current) return;
-      toast.error(e?.response?.data?.message ?? "Failed to load categories");
+      msgApi.error(errMsg(e, "Failed to load categories"));
     } finally {
       if (reqId === reqIdRef.current) setLoadingList(false);
     }
@@ -82,6 +91,7 @@ export default function MenuCategories() {
     setEditing(null);
     setModalOpen(true);
   }
+
   function openEdit(cat: MenuCategory) {
     setFormError(null);
     setModalMode("edit");
@@ -94,23 +104,27 @@ export default function MenuCategories() {
     setFormError(null);
 
     try {
-      if (modalMode === "create") await createAdminCategory(values);
-      else if (editing?._id) await updateAdminCategory(editing._id, values);
+      if (modalMode === "create") {
+        await createAdminCategory(values);
+        msgApi.success("Category created");
+      } else if (editing?._id) {
+        await updateAdminCategory(editing._id, values);
+        msgApi.success("Category updated");
+      }
 
       setModalOpen(false);
       await load();
     } catch (e: any) {
-      const msg = e?.response?.data?.message ?? "Save failed";
+      const msg = errMsg(e, "Save failed");
       if (e?.response?.status === 409) {
         setFormError({ field: "name", message: msg });
         return;
       }
-      toast.error(msg);
+      msgApi.error(msg);
     } finally {
       setSaving(false);
     }
   }
-
 
   function requestToggleStatus(cat: MenuCategory) {
     if (cat.status === "active") {
@@ -118,43 +132,47 @@ export default function MenuCategories() {
       setDeactOpen(true);
       return;
     }
-
     void doToggleStatus(cat);
   }
 
   async function doToggleStatus(cat: MenuCategory) {
     const next: CategoryStatus = cat.status === "active" ? "inactive" : "active";
 
-    setRows((prev) => prev.map((r) => (r._id === cat._id ? { ...r, status: next } : r)));
+    setRows((prev) =>
+      prev.map((r) => (r._id === cat._id ? { ...r, status: next } : r))
+    );
 
     try {
       await patchAdminCategoryStatus(cat._id, next);
+      msgApi.success(
+        next === "active" ? "Category activated" : "Category deactivated"
+      );
     } catch (e: any) {
       setRows((prev) => prev.map((r) => (r._id === cat._id ? cat : r)));
-      toast.error(e?.response?.data?.message ?? "Failed to change status");
+      msgApi.error(errMsg(e, "Failed to change status"));
     }
   }
 
-  // Handle delete
   const [deactOpen, setDeactOpen] = useState(false);
   const [deactCat, setDeactCat] = useState<MenuCategory | null>(null);
   const [deactLoading, setDeactLoading] = useState(false);
 
   async function confirmDeactivate() {
-  if (!deactCat) return;
-  setDeactLoading(true);
-
-  try {
-    await doToggleStatus(deactCat);
-    setDeactOpen(false);
-    setDeactCat(null);
-  } finally {
-    setDeactLoading(false);
+    if (!deactCat) return;
+    setDeactLoading(true);
+    try {
+      await doToggleStatus(deactCat);
+      setDeactOpen(false);
+      setDeactCat(null);
+    } finally {
+      setDeactLoading(false);
+    }
   }
-}
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] p-4 md:p-6 font-sans text-slate-900">
+      {msgCtx}
+
       <div className="max-w-7xl mx-auto space-y-4 md:space-y-6">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -232,7 +250,7 @@ export default function MenuCategories() {
 
         {/* Content Container */}
         <div className="bg-white border border-slate-200 shadow-sm overflow-hidden">
-          {/* Desktop Table: Hidden on Mobile */}
+          {/* Desktop Table */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -299,7 +317,7 @@ export default function MenuCategories() {
             </table>
           </div>
 
-          {/* Mobile Card View: Hidden on Desktop */}
+          {/* Mobile Card View */}
           <div className="md:hidden divide-y divide-slate-100">
             {loadingList ? (
               <LoadingSkeleton count={3} mobile />
@@ -411,10 +429,11 @@ export default function MenuCategories() {
         cancelText="Cancel"
         tone="warning"
         loading={deactLoading}
-        onClose={() => (!deactLoading ? (setDeactOpen(false), setDeactCat(null)) : null)}
+        onClose={() =>
+          !deactLoading ? (setDeactOpen(false), setDeactCat(null)) : null
+        }
         onConfirm={confirmDeactivate}
       />
-
     </div>
   );
 }
@@ -436,7 +455,13 @@ const StatusBadge = ({ status }: { status: CategoryStatus }) => (
   </span>
 );
 
-const StatusToggle = ({ cat, onToggle }: { cat: MenuCategory; onToggle: any }) => (
+const StatusToggle = ({
+  cat,
+  onToggle,
+}: {
+  cat: MenuCategory;
+  onToggle: any;
+}) => (
   <button
     onClick={() => onToggle(cat)}
     className={`p-2 rounded-lg transition-all border shadow-sm ${
@@ -473,7 +498,13 @@ const EmptyState = () => (
   </div>
 );
 
-const LoadingSkeleton = ({ count, mobile }: { count: number; mobile?: boolean }) => (
+const LoadingSkeleton = ({
+  count,
+  mobile,
+}: {
+  count: number;
+  mobile?: boolean;
+}) => (
   <>
     {Array.from({ length: count }).map((_, i) =>
       mobile ? (

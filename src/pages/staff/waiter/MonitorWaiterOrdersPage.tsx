@@ -3,7 +3,7 @@ import { io, type Socket } from "socket.io-client";
 import { cn } from "../../../utils/cn";
 import { formatMoneyFromCents } from "../../../utils/money";
 import { listStaffOrdersForMonitorApi, type StaffOrder } from "../../../api/staff/staff.orders";
-import { StickyNote, RefreshCw } from "lucide-react";
+import { StickyNote } from "lucide-react";
 
 type OrderTabKey = "pending" | "accepted" | "kitchen" | "ready_to_service" | "rejected";
 
@@ -132,7 +132,6 @@ export default function MonitorWaiterOrdersPage() {
     loadOrders();
   }, []);
 
-  // socket refresh orders only
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (!token) return;
@@ -275,7 +274,7 @@ export default function MonitorWaiterOrdersPage() {
             })}
           </div>
 
-          {/* View-only: KHÔNG render nút Accept/Reject/Served */}
+          {/* View-only: Accept/Reject/Served */}
           <div className="mt-3 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
             View-only (Admin Monitor)
           </div>
@@ -313,16 +312,6 @@ export default function MonitorWaiterOrdersPage() {
             <button onClick={() => setOrderTab("ready_to_service")} className={tabBtnClass(orderTab === "ready_to_service")}>
               Ready to Serve <span className={badgeClass(orderTab === "ready_to_service")}>{orderCounts.ready_to_service}</span>
               <span className={underlineClass(orderTab === "ready_to_service")} />
-            </button>
-
-            <div className="flex-1" />
-            <button
-              onClick={loadOrders}
-              className="inline-flex items-center gap-2 px-3 py-3 text-sm font-semibold text-white/80 hover:text-white"
-              title="Refresh"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
             </button>
           </div>
         </div>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Input, Pagination, Select, Tag, message, Spin, Button } from "antd";
-import { Search, X } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Search, X, Monitor } from "lucide-react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 
 import {
@@ -20,7 +20,6 @@ const DATE_OPTIONS: Array<{ label: string; value: OrdersDateFilter }> = [
 
 const STATUS_OPTIONS = [
   { label: "All", value: "" },
-  { label: "Draft", value: "draft" },
   { label: "Pending", value: "pending" },
   { label: "Accepted", value: "accepted" },
   { label: "Preparing", value: "preparing" },
@@ -53,7 +52,6 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-// quick fix since TS sometimes complains about Tag color types in antd versions
 function banningFix(v: any) {
   return v;
 }
@@ -66,13 +64,13 @@ function setQS(sp: URLSearchParams, k: string, v?: string) {
 }
 
 export default function OrdersPage() {
+  const nav = useNavigate();
   const [sp, setSp] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AdminOrderRow[]>([]);
   const [total, setTotal] = useState(0);
 
-  // read from querystring
   const date = (sp.get("date") as OrdersDateFilter) || "today";
   const status = sp.get("status") || "";
   const tableId = sp.get("tableId") || "";
@@ -104,7 +102,6 @@ export default function OrdersPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, status, tableId, q, page, pageSize]);
 
   const showing = useMemo(() => {
@@ -117,7 +114,6 @@ export default function OrdersPage() {
   const onChangeFilter = (k: string, v?: string) => {
     let next = setQS(sp, k, v);
 
-    // changing any filter resets page
     next = setQS(next, "page", "1");
     setSp(next);
   };
@@ -138,22 +134,57 @@ export default function OrdersPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <div className="text-xl font-semibold">Orders</div>
-          <div className="text-sm text-slate-500">Filter, search and monitor orders</div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-1">
+          <div className="text-3xl font-black text-slate-900 tracking-tight">Orders</div>
+          <div className="text-sm font-semibold text-slate-500">Manage your orders</div>
         </div>
 
-        {hasFilters ? (
-          <Button onClick={clearFilters} icon={<X className="w-4 h-4" />} className="rounded-xl">
-            Clear filters
-          </Button>
-        ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              onClick={() => nav("/monitor/kds")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <Monitor className="h-4 w-4" />
+              <span>Open KDS</span>
+            </button>
+
+            <button
+              onClick={() => nav("/monitor/waiter")}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-[#E2B13C] hover:text-slate-900"
+            >
+              <Monitor className="h-4 w-4" />
+              <span>Open Waiter</span>
+            </button>
+          </div>
+
+          {hasFilters ? (
+            <Button
+              onClick={clearFilters}
+              icon={<X className="w-4 h-4" />}
+              className="rounded-xl"
+            >
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* Filters */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          <div className="md:col-span-6">
+            <div className="text-xs text-slate-500 mb-1">Search</div>
+            <Input
+              value={q}
+              onChange={(e) => onChangeFilter("q", e.target.value)}
+              prefix={<Search className="w-4 h-4 text-slate-400" />}
+              placeholder="Input Order ID or Table number"
+              allowClear
+            />
+          </div>
+
           <div className="md:col-span-3">
             <div className="text-xs text-slate-500 mb-1">Date</div>
             <Select
@@ -173,34 +204,13 @@ export default function OrdersPage() {
               className="w-full"
             />
           </div>
-
-          <div className="md:col-span-3">
-            <div className="text-xs text-slate-500 mb-1">Table (ID)</div>
-            <Input
-              value={tableId}
-              onChange={(e) => onChangeFilter("tableId", e.target.value)}
-              placeholder="tableId (optional)"
-              allowClear
-            />
-          </div>
-
-          <div className="md:col-span-3">
-            <div className="text-xs text-slate-500 mb-1">Search</div>
-            <Input
-              value={q}
-              onChange={(e) => onChangeFilter("q", e.target.value)}
-              prefix={<Search className="w-4 h-4 text-slate-400" />}
-              placeholder="Order ID hoặc Table number"
-              allowClear
-            />
-          </div>
         </div>
       </div>
 
       {/* Table */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-          <div className="text-sm text-slate-600">Showing: {showing}</div>
+          <div className="text-sm text-slate-600">Total: {showing}</div>
         </div>
 
         {loading ? (

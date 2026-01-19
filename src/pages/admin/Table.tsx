@@ -27,25 +27,33 @@ import {
 } from "lucide-react";
 import type { Socket } from "socket.io-client";
 import { connectStaffSocket } from "../../ws/staffSocket";
+import { message } from "antd";
+
+function errMsg(e: any, fallback: string) {
+  return e?.response?.data?.message ?? e?.message ?? fallback;
+}
 
 const Tables = () => {
+  const [msgApi, msgCtx] = message.useMessage();
+
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(false);
   const [openForm, setOpenForm] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
+
   const [confirmRegenAllOpen, setConfirmRegenAllOpen] = useState(false);
   const [regenAllLoading, setRegenAllLoading] = useState(false);
   const [regenAllError, setRegenAllError] = useState<string | null>(null);
+
   const [confirmToggleOpen, setConfirmToggleOpen] = useState(false);
   const [toggleTarget, setToggleTarget] = useState<Table | null>(null);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [toggleError, setToggleError] = useState<string | null>(null);
+
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    if (!socketRef.current) {
-      socketRef.current = connectStaffSocket();
-    }
+    if (!socketRef.current) socketRef.current = connectStaffSocket();
 
     const socket = socketRef.current;
 
@@ -53,17 +61,13 @@ const Tables = () => {
       setTables((prev) =>
         prev.map((t) =>
           String(t.id) === String(p.tableId)
-            ? {
-                ...t,
-                status: p.status ?? t.status,
-              }
+            ? { ...t, status: p.status ?? t.status }
             : t
         )
       );
     };
 
     socket.on("table.status_changed", onTableStatusChanged);
-
     return () => {
       socket.off("table.status_changed", onTableStatusChanged);
     };
@@ -84,6 +88,8 @@ const Tables = () => {
       setLoading(true);
       const data = await getTables();
       setTables(data);
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Failed to load tables"));
     } finally {
       setLoading(false);
     }
@@ -91,32 +97,37 @@ const Tables = () => {
 
   useEffect(() => {
     fetchTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleGetQR = async (table: Table) => {
-    const res = await getTableQR(table.id);
-
-    setQrData({
-      tableId: table.id,
-      tableName: table.tableNumber,
-      capacity: table.capacity,
-      location: table.location,
-      qrUrl: res.qrUrl,
-      createdAt: res.createdAt,
-    });
+    try {
+      const res = await getTableQR(table.id);
+      setQrData({
+        tableId: table.id,
+        tableName: table.tableNumber,
+        capacity: table.capacity,
+        location: table.location,
+        qrUrl: res.qrUrl,
+        createdAt: res.createdAt,
+      });
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Failed to load QR"));
+    }
   };
 
   const handleRegenerateQR = async (tableId: string) => {
-    const res = await generateTableQR(tableId);
-    setQrData((prev) =>
-      prev
-        ? {
-            ...prev,
-            qrUrl: res.qrUrl,
-            createdAt: res.createdAt,
-          }
-        : null
-    );
+    try {
+      const res = await generateTableQR(tableId);
+      setQrData((prev) =>
+        prev
+          ? { ...prev, qrUrl: res.qrUrl, createdAt: res.createdAt }
+          : null
+      );
+      msgApi.success("QR regenerated");
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Failed to regenerate QR"));
+    }
   };
 
   const askToggleStatus = (table: Table) => {
@@ -132,14 +143,22 @@ const Tables = () => {
       setToggleLoading(true);
       setToggleError(null);
 
-      const newStatus = toggleTarget.status === "active" ? "inactive" : "active";
+      const newStatus =
+        toggleTarget.status === "active" ? "inactive" : "active";
+
       await updateTableStatus(toggleTarget.id, newStatus);
+
+      msgApi.success(
+        newStatus === "active" ? "Table activated" : "Table deactivated"
+      );
 
       setConfirmToggleOpen(false);
       setToggleTarget(null);
       await fetchTables();
     } catch (e: any) {
-      setToggleError(e?.response?.data?.message ?? "Failed to change table status");
+      const msg = errMsg(e, "Failed to change table status");
+      setToggleError(msg);
+      msgApi.error(msg);
     } finally {
       setToggleLoading(false);
     }
@@ -151,17 +170,31 @@ const Tables = () => {
   };
 
   const handleSubmitTable = async (data: Partial<Table>) => {
-    if (editingTable) {
-      await updateTable(editingTable.id, data);
-    } else {
-      await createTable(data);
+    try {
+      if (editingTable) {
+        await updateTable(editingTable.id, data);
+        msgApi.success("Table updated");
+      } else {
+        await createTable(data);
+        msgApi.success("Table created");
+      }
+      setOpenForm(false);
+      setEditingTable(null);
+      await fetchTables();
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Save table failed"));
+      throw e; // nếu TableForm đang expect throw để show field error
     }
-    await fetchTables();
   };
 
   const handleDownloadAllQR = async () => {
-    const blob = await downloadAllTableQRs("zip");
-    saveAs(blob, "all-tables-qr.zip");
+    try {
+      const blob = await downloadAllTableQRs("zip");
+      saveAs(blob, "all-tables-qr.zip");
+      msgApi.success("Downloaded all QR");
+    } catch (e: any) {
+      msgApi.error(errMsg(e, "Download failed"));
+    }
   };
 
   const askRegenerateAllQR = () => {
@@ -176,10 +209,14 @@ const Tables = () => {
 
       await regenerateAllTableQR();
 
+      msgApi.success("Regenerated all QR codes");
+
       setConfirmRegenAllOpen(false);
       await fetchTables();
-    } catch (error) {
-      setRegenAllError("Failed to regenerate QR codes");
+    } catch (e: any) {
+      const msg = errMsg(e, "Failed to regenerate QR codes");
+      setRegenAllError(msg);
+      msgApi.error(msg);
     } finally {
       setRegenAllLoading(false);
     }
@@ -191,6 +228,8 @@ const Tables = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] p-6 space-y-8 font-sans">
+      {msgCtx}
+
       {/* Page header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -236,7 +275,9 @@ const Tables = () => {
       {/* All table sections */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
-          <h3 className="text-lg font-bold text-slate-800">Restaurant Floor Map</h3>
+          <h3 className="text-lg font-bold text-slate-800">
+            Restaurant Floor Map
+          </h3>
 
           <div className="flex flex-wrap gap-3">
             <button
@@ -367,8 +408,12 @@ const ConfirmDialog = ({
         <div className="px-6 py-5 border-b border-slate-100">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h4 className="text-base sm:text-lg font-black text-slate-800">{title}</h4>
-              <p className="mt-2 text-sm text-slate-600 leading-relaxed">{message}</p>
+              <h4 className="text-base sm:text-lg font-black text-slate-800">
+                {title}
+              </h4>
+              <p className="mt-2 text-sm text-slate-600 leading-relaxed">
+                {message}
+              </p>
             </div>
             <button
               onClick={onCancel}

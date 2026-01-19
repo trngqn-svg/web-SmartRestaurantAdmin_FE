@@ -6,17 +6,32 @@ export type ReportOverview = {
   range: ReportRange;
   from: string;
   to: string;
+  prevFrom: string;
+  prevTo: string;
   totals: {
     revenueCents: number;
+    revenueDeltaPct: number;
+
     ordersServed: number;
+    ordersDeltaPct: number;
+
     avgOrderValueCents: number;
-    avgPrepTimeSeconds: number | null;
+    aovDeltaPct: number;
+
+    avgPrepTimeSeconds: number;
     avgPrepSampleSize: number;
   };
   revenueSeries: Array<{ key: string; revenueCents: number }>;
   peakHours: Array<{ hour: number; orders: number }>;
-  topItems: Array<{ itemId: string; name: string; totalQty: number }>;
+  topItems: Array<{
+    itemId: string;
+    name: string;
+    totalQty: number;
+    revenueCents: number;
+    trendPct: number;
+  }>;
 };
+
 
 export async function getAdminReportOverview(params: {
   range: ReportRange;

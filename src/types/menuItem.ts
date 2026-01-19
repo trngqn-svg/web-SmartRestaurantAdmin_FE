@@ -1,4 +1,3 @@
-
 export type ItemStatus = "available" | "unavailable" | "sold_out";
 
 export type CategoryRef = {
