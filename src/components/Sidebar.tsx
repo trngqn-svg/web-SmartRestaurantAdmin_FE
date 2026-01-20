@@ -8,7 +8,8 @@ import {
   UtensilsCrossed,
   User,
   ChartColumn,
-  ReceiptText
+  ReceiptText,
+  UserPen
 } from 'lucide-react';
 
 interface SidebarLinkProps {
@@ -70,6 +71,7 @@ export default function Sidebar() {
         <SidebarLink to="/tables" icon={<Grid2X2 size={20} />} label="Tables" />
         <SidebarLink to="/reports" icon={<ChartColumn size={20} />} label="Reports" />
         <SidebarLink to="/accounts" icon={<User size={20} />} label="Accounts" />
+        <SidebarLink to="/profile" icon={<UserPen size={20} />} label="Profile" />
       </nav>
 
       {/* Bottom Section: User Profile */}
