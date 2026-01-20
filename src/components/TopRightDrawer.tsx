@@ -26,6 +26,7 @@ const MENU_SECTIONS = [
       { label: 'Tables', to: '/tables' },
       { label: 'Reports', to: '/reports' },
       { label: 'Accounts', to: '/accounts' },
+      { label: 'Profile', to: '/profile' },
     ],
   },
   {

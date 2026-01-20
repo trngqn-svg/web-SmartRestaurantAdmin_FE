@@ -23,6 +23,7 @@ import CustomerCartPage from "../pages/customer/CustomerCartPage";
 import CustomerOrderPage from "../pages/customer/CustomerOrderPage";
 import CustomerProfilePage from "../pages/customer/CustomerProfilePage";
 import CustomerBillPage from "../pages/customer/CustomerBillPage";
+import ProfileAdminPage from "../pages/admin/ProfileAdminPage";
 
 export default function AppRoute() {
   return (
@@ -60,6 +61,7 @@ export default function AppRoute() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/accounts" element={<AccountsPage />} />
+        <Route path="/profile" element={<ProfileAdminPage />} />
       </Route>
 
       <Route
