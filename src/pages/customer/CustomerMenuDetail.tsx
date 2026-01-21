@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Clock, Utensils, Star } from "lucide-react";
+
 import { getCustomerMenu } from "../../api/customer/menu";
 import type { CustomerMenuResponse } from "../../api/customer/menu";
 import { fileUrl } from "../../utils/fileUrl";
-import { getItemReviews } from "../../api/customer/review";
+import ReviewsSection from "../../components/customer/ReviewsSection";
 
 function cn(...xs: Array<string | false | undefined | null>) {
   return xs.filter(Boolean).join(" ");
@@ -42,24 +43,19 @@ export default function CustomerMenuDetail() {
   const location = useLocation();
 
   const stateItem = (location.state as any)?.item as MenuItemDTO | null;
+  const from = (location.state as any)?.from as string | undefined;
 
   const [menuData, setMenuData] = useState<CustomerMenuResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [qty, setQty] = useState(1);
   const [instructions, setInstructions] = useState("");
-
   const [selected, setSelected] = useState<Record<string, string[]>>({});
-
-  const [reviewsData, setReviewsData] =
-    useState<null | Awaited<ReturnType<typeof getItemReviews>>>(null);
-  const [reviewsLoading, setReviewsLoading] = useState(false);
-
-  const from = (location.state as any)?.from as string | undefined;
 
   useEffect(() => {
     let mounted = true;
 
+    // If we already have item in state => don't block UI
     setLoading(!stateItem);
 
     getCustomerMenu({ page: 1, limit: 200, sort: "createdAt" })
@@ -77,33 +73,15 @@ export default function CustomerMenuDetail() {
     };
   }, [stateItem]);
 
-  useEffect(() => {
-    if (!id) return;
-    let mounted = true;
-
-    setReviewsLoading(true);
-    getItemReviews(id, { page: 1, limit: 5, sort: "latest" })
-      .then((res) => {
-        if (!mounted) return;
-        setReviewsData(res);
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setReviewsLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
-
   const item = useMemo<MenuItemDTO | null>(() => {
     if (!id) return null;
     if (stateItem) return stateItem;
+
     const list = (menuData?.items ?? []) as any[];
     return (list.find((x) => String(x?.id) === String(id)) as any) ?? null;
   }, [id, stateItem, menuData]);
 
+  // Reset selections when item changes
   useEffect(() => {
     if (!item) return;
 
@@ -145,21 +123,11 @@ export default function CustomerMenuDetail() {
     return (base + modifiersTotal) * qty;
   }, [item?.price, modifiersTotal, qty]);
 
-  const ratingAvg = useMemo(() => {
-    return Number(reviewsData?.summary?.ratingAvg ?? item?.ratingAvg ?? 0);
-  }, [reviewsData?.summary?.ratingAvg, item?.ratingAvg]);
-
-  const ratingCount = useMemo(() => {
-    return Number(reviewsData?.summary?.ratingCount ?? item?.ratingCount ?? 0);
-  }, [reviewsData?.summary?.ratingCount, item?.ratingCount]);
-
   const relatedItems = useMemo(() => {
     if (!item?.id) return [];
     if (!menuData?.items?.length) return [];
-
     const catId = (item as any).categoryId;
     if (!catId) return [];
-
     return (menuData.items as any[])
       .filter((x) => String(x?.id) !== String(item.id))
       .filter((x) => String(x?.categoryId) === String(catId))
@@ -174,6 +142,11 @@ export default function CustomerMenuDetail() {
       const next = has ? cur.filter((x) => x !== optId) : [...cur, optId];
       return { ...prev, [group._id]: next };
     });
+  }
+
+  function goBack() {
+    if (from) nav(from);
+    else nav(-1);
   }
 
   if (loading) {
@@ -193,10 +166,8 @@ export default function CustomerMenuDetail() {
           Item not found.
         </div>
         <button
-          onClick={() => {
-            if (from) nav(from);
-            else nav(-1);
-          }}
+          type="button"
+          onClick={goBack}
           className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-[#E2B13C]"
         >
           Go back
@@ -213,7 +184,7 @@ export default function CustomerMenuDetail() {
           <div className="relative flex items-center justify-center">
             <button
               type="button"
-              onClick={() => nav(-1)}
+              onClick={goBack}
               className="absolute left-0 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 text-[#E2B13C]"
               aria-label="Back"
             >
@@ -234,10 +205,7 @@ export default function CustomerMenuDetail() {
             <img
               src={photoUrl}
               alt={item.name}
-              className={cn(
-                "h-full w-full object-contain bg-gray-100",
-                "contrast-105 saturate-110"
-              )}
+              className={cn("h-full w-full object-contain bg-gray-100", "contrast-105 saturate-110")}
               loading="eager"
               decoding="async"
             />
@@ -255,8 +223,8 @@ export default function CustomerMenuDetail() {
               <h2 className="truncate text-[22px] font-semibold text-slate-800">{item.name}</h2>
 
               <div className="mt-2 flex items-center gap-2 text-sm">
-                <Stars value={ratingAvg} />
-                <span className="text-orange-500 font-medium">({ratingCount} reviews)</span>
+                <Stars value={Number(item.ratingAvg ?? 0)} />
+                <span className="text-orange-500 font-medium">({Number(item.ratingCount ?? 0)} reviews)</span>
               </div>
 
               <div className="mt-2 flex items-center gap-3 text-sm text-slate-500">
@@ -305,6 +273,7 @@ export default function CustomerMenuDetail() {
                         .filter((o) => o.status === "active")
                         .map((o) => {
                           const active = picked.includes(o._id);
+
                           return (
                             <button
                               key={o._id}
@@ -315,10 +284,10 @@ export default function CustomerMenuDetail() {
                                 active ? "border-emerald-600 bg-emerald-50" : "border-slate-200 bg-white"
                               )}
                             >
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
                                 <span
                                   className={cn(
-                                    "inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs",
+                                    "inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs shrink-0",
                                     active
                                       ? "border-emerald-600 bg-emerald-50 text-emerald-700"
                                       : "border-slate-300 text-slate-300"
@@ -326,10 +295,10 @@ export default function CustomerMenuDetail() {
                                 >
                                   {isSingle ? (active ? "●" : "○") : active ? "☑" : "☐"}
                                 </span>
-                                <span className="text-[13px] font-medium text-slate-700">{o.name}</span>
+                                <span className="text-[13px] font-medium text-slate-700 truncate">{o.name}</span>
                               </div>
 
-                              <span className="text-[12px] font-semibold text-slate-500">
+                              <span className="text-[12px] font-semibold text-slate-500 whitespace-nowrap">
                                 {Number(o.priceAdjustment) > 0
                                   ? `+$${Number(o.priceAdjustment).toFixed(2)}`
                                   : "+$0"}
@@ -368,7 +337,7 @@ export default function CustomerMenuDetail() {
                   <button
                     key={x.id}
                     type="button"
-                    onClick={() => nav(`/customer/menu/${x.id}`, { state: { item: x } })}
+                    onClick={() => nav(`/customer/menu/${x.id}`, { state: { item: x, from: from ?? (location.pathname + location.search) } })}
                     className="shrink-0 rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600"
                   >
                     {x.name}
@@ -379,31 +348,8 @@ export default function CustomerMenuDetail() {
 
             <div className="h-px bg-slate-100" />
 
-            {/* Reviews */}
-            <div className="text-sm font-semibold text-slate-800">
-              Reviews
-              <div className="text-xs font-normal text-gray-500">{ratingCount} review</div>
-            </div>
-
-            {reviewsLoading ? (
-              <div className="text-sm text-slate-400">Loading reviews...</div>
-            ) : (reviewsData?.reviews?.length ?? 0) === 0 ? (
-              <div className="text-sm text-slate-400">No reviews yet.</div>
-            ) : (
-              <div className="space-y-3">
-                {reviewsData!.reviews.map((r) => (
-                  <div key={r.id} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <Stars value={r.rating} />
-                      <span className="text-[11px] text-slate-400">
-                        {new Date(r.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-sm text-slate-600">{r.comment || "No comment."}</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Reviews (admin API, but still embedded here) */}
+            {id ? <ReviewsSection itemId={id} /> : null}
           </div>
         </div>
 
@@ -437,6 +383,10 @@ export default function CustomerMenuDetail() {
                     "flex-1 h-12 rounded-2xl px-5 text-[15px] font-semibold text-[#E2B13C] shadow-sm transition active:scale-[0.99]",
                     canOrder ? "bg-slate-900" : "bg-slate-200 text-slate-500"
                   )}
+                  onClick={() => {
+                    // TODO: call add-to-cart here
+                    // payload: itemId, qty, instructions, selected modifiers
+                  }}
                 >
                   Add to Cart - ${totalPrice.toFixed(2)}
                 </button>
@@ -455,6 +405,8 @@ export default function CustomerMenuDetail() {
   );
 }
 
+/* -------------------- UI helpers -------------------- */
+
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, { label: string; wrap: string; dot: string }> = {
     available: { label: "Available", wrap: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500" },
@@ -462,7 +414,8 @@ function StatusPill({ status }: { status: string }) {
   };
 
   const key = String(status ?? "").toLowerCase();
-  const cfg = map[key] ?? { label: key || "unknown", wrap: "bg-slate-100 text-slate-700", dot: "bg-slate-400" };
+  const cfg =
+    map[key] ?? { label: key || "unknown", wrap: "bg-slate-100 text-slate-700", dot: "bg-slate-400" };
 
   return (
     <span className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium", cfg.wrap)}>
