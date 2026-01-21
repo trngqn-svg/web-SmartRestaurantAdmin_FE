@@ -423,6 +423,9 @@ export default function MenuItems() {
                         ${it.price.toFixed(2)}
                       </div>
                     </div>
+                    <span className="ml-auto text-xs text-orange-500 drop-shadow-sm">
+                      {it.popularityCount} orders
+                    </span>
 
                     <p className="flex-1 text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed font-normal">
                       {it.description ||
