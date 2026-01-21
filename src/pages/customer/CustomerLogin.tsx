@@ -1,8 +1,10 @@
-import { UtensilsCrossed } from 'lucide-react';
+import { UtensilsCrossed, Eye, EyeOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 
 const CustomLogin = () => {
   const nav = useNavigate();
+  const [show, setShow] = useState(false);
 
   return (
     <div className="min-h-[100svh] bg-[#EEF1F5] flex justify-center font-sans">
@@ -40,14 +42,34 @@ const CustomLogin = () => {
 
             {/* Password Field */}
             <div className="space-y-1.5">
-              <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider ml-1">Password</label>
-              <input
-                type="password"
-                placeholder="Enter your password"
-                className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 text-[15px] outline-none transition-all focus:bg-white focus:ring-4 focus:ring-[#E2B13C]/10 focus:border-[#E2B13C]"
-              />
+              <label className="text-[13px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+                Password
+              </label>
+
+              <div className="relative">
+                <input
+                  type={show ? "text" : "password"}
+                  placeholder="Enter your password"
+                  className="w-full rounded-2xl border border-slate-100 bg-slate-50 px-5 py-4 pr-12 text-[15px] outline-none transition-all
+                    focus:bg-white focus:ring-4 focus:ring-[#E2B13C]/10 focus:border-[#E2B13C]"
+                />
+
+                {/* Toggle button */}
+                <button
+                  type="button"
+                  onClick={() => setShow(v => !v)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#E2B13C]"
+                  aria-label={show ? "Hide password" : "Show password"}
+                >
+                  {show ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+
               <div className="flex justify-end pr-1 pt-1">
-                <button type="button" className="text-sm font-semibold text-[#E2B13C] hover:text-[#c59a34]">
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-[#E2B13C] hover:text-[#c59a34]"
+                >
                   Forgot Password?
                 </button>
               </div>

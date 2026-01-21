@@ -29,6 +29,10 @@ const STATUS_OPTIONS = [
   { label: "Cancelled", value: "cancelled" },
 ];
 
+function banningFix(v: any) {
+  return v;
+}
+
 function StatusPill({ status }: { status: string }) {
   const color =
     status === "served"
@@ -52,15 +56,24 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-function banningFix(v: any) {
-  return v;
-}
-
 function setQS(sp: URLSearchParams, k: string, v?: string) {
   const next = new URLSearchParams(sp);
   if (!v) next.delete(k);
   else next.set(k, v);
   return next;
+}
+
+function getOrderTime(row: AdminOrderRow) {
+  const t =
+    row.submittedAt ? dayjs(row.submittedAt) : row.createdAt ? dayjs(row.createdAt) : null;
+  return t;
+}
+
+function buildItemsSummary(row: AdminOrderRow) {
+  const items = row.items ?? [];
+  const head = items.slice(0, 3).map((it) => `${it.name} x${it.qty}`);
+  const more = items.length > 3 ? ` +${items.length - 3} more` : "";
+  return head.join(", ") + more;
 }
 
 export default function OrdersPage() {
@@ -113,7 +126,6 @@ export default function OrdersPage() {
 
   const onChangeFilter = (k: string, v?: string) => {
     let next = setQS(sp, k, v);
-
     next = setQS(next, "page", "1");
     setSp(next);
   };
@@ -134,17 +146,20 @@ export default function OrdersPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
+      {/* Header */}
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div className="space-y-1">
-          <div className="text-3xl font-black text-slate-900 tracking-tight">Orders</div>
+          <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+            Orders
+          </div>
           <div className="text-sm font-semibold text-slate-500">Manage your orders</div>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               onClick={() => nav("/monitor/kds")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               <Monitor className="h-4 w-4" />
               <span>Open KDS</span>
@@ -152,7 +167,7 @@ export default function OrdersPage() {
 
             <button
               onClick={() => nav("/monitor/waiter")}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-[#E2B13C] hover:text-slate-900"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-[#E2B13C] hover:text-slate-900"
             >
               <Monitor className="h-4 w-4" />
               <span>Open Waiter</span>
@@ -160,11 +175,7 @@ export default function OrdersPage() {
           </div>
 
           {hasFilters ? (
-            <Button
-              onClick={clearFilters}
-              icon={<X className="w-4 h-4" />}
-              className="rounded-xl"
-            >
+            <Button onClick={clearFilters} icon={<X className="w-4 h-4" />} className="rounded-xl">
               Clear filters
             </Button>
           ) : null}
@@ -174,7 +185,7 @@ export default function OrdersPage() {
       {/* Filters */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div className="md:col-span-6">
+          <div className="md:col-span-6 lg:col-span-7">
             <div className="text-xs text-slate-500 mb-1">Search</div>
             <Input
               value={q}
@@ -185,7 +196,7 @@ export default function OrdersPage() {
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 lg:col-span-2">
             <div className="text-xs text-slate-500 mb-1">Date</div>
             <Select
               value={date}
@@ -195,7 +206,7 @@ export default function OrdersPage() {
             />
           </div>
 
-          <div className="md:col-span-3">
+          <div className="md:col-span-3 lg:col-span-3">
             <div className="text-xs text-slate-500 mb-1">Status</div>
             <Select
               value={status}
@@ -207,7 +218,7 @@ export default function OrdersPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* List/Table container */}
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
           <div className="text-sm text-slate-600">Total: {showing}</div>
@@ -217,43 +228,53 @@ export default function OrdersPage() {
           <div className="py-14 flex items-center justify-center">
             <Spin />
           </div>
+        ) : rows.length === 0 ? (
+          <div className="px-4 py-10 text-center text-slate-500">No orders</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-600">
-                <tr>
-                  <th className="text-left font-medium px-4 py-3 w-[230px]">Order ID</th>
-                  <th className="text-left font-medium px-4 py-3 w-[110px]">Table</th>
-                  <th className="text-left font-medium px-4 py-3">Items</th>
-                  <th className="text-right font-medium px-4 py-3 w-[140px]">Total</th>
-                  <th className="text-left font-medium px-4 py-3 w-[170px]">Status</th>
-                  <th className="text-left font-medium px-4 py-3 w-[150px]">Time</th>
-                </tr>
-              </thead>
+          <>
+            {/* MOBILE: cards (no overflow/tràn) */}
+            <div className="md:hidden divide-y divide-slate-100">
+              {rows.map((row) => (
+                <OrderCard key={row.orderId} row={row} />
+              ))}
+            </div>
 
-              <tbody>
-                {rows.length === 0 ? (
+            {/* DESKTOP: table */}
+            <div className="hidden md:block w-full overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-600">
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                      No orders
-                    </td>
+                    <th className="text-left font-medium px-4 py-3 w-[230px]">Order ID</th>
+                    <th className="text-left font-medium px-4 py-3 w-[110px] whitespace-nowrap">
+                      Table
+                    </th>
+                    <th className="text-left font-medium px-4 py-3">Items</th>
+                    <th className="text-right font-medium px-4 py-3 w-[140px] whitespace-nowrap">
+                      Total
+                    </th>
+                    <th className="text-left font-medium px-4 py-3 w-[170px]">Status</th>
+                    <th className="text-left font-medium px-4 py-3 w-[150px] whitespace-nowrap">
+                      Time
+                    </th>
                   </tr>
-                ) : (
-                  rows.map((o) => (
-                    <OrderRow key={o.orderId} row={o} />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {rows.map((o) => (
+                    <OrderRowDesktop key={o.orderId} row={o} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
-        <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-end">
+        <div className="px-4 py-3 border-t border-slate-200 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Pagination
             current={page}
             pageSize={pageSize}
             total={total}
             showSizeChanger
+            responsive
             pageSizeOptions={[5, 10, 20, 50]}
             onChange={onChangePaging}
           />
@@ -263,9 +284,49 @@ export default function OrdersPage() {
   );
 }
 
-function OrderRow({ row }: { row: AdminOrderRow }) {
-  const time =
-    row.submittedAt ? dayjs(row.submittedAt) : row.createdAt ? dayjs(row.createdAt) : null;
+/** MOBILE card */
+function OrderCard({ row }: { row: AdminOrderRow }) {
+  const time = getOrderTime(row);
+  const itemsSummary = buildItemsSummary(row);
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="text-sm font-extrabold text-slate-900 whitespace-nowrap">
+              Table #{row.tableNumber}
+            </div>
+            <div className="shrink-0">
+              <StatusPill status={row.status} />
+            </div>
+          </div>
+
+          <div className="mt-1 text-xs text-slate-500 font-mono break-all">
+            {row.orderId}
+          </div>
+
+          <div className="mt-2 text-sm text-slate-800">
+            <div className="line-clamp-2">{itemsSummary}</div>
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          <div className="text-sm font-bold text-slate-900 whitespace-nowrap">
+            {formatMoneyFromCents(row.totalCents)}
+          </div>
+          <div className="mt-1 text-xs text-slate-500 whitespace-nowrap">
+            {time ? time.format("HH:mm DD/MM") : "—"}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** DESKTOP row */
+function OrderRowDesktop({ row }: { row: AdminOrderRow }) {
+  const time = getOrderTime(row);
 
   return (
     <tr className="border-t border-slate-100">
@@ -273,7 +334,7 @@ function OrderRow({ row }: { row: AdminOrderRow }) {
         <div className="font-medium text-slate-900">{row.orderId}</div>
       </td>
 
-      <td className="px-4 py-3">
+      <td className="px-4 py-3 whitespace-nowrap">
         <div className="font-medium">#{row.tableNumber}</div>
       </td>
 
@@ -290,7 +351,7 @@ function OrderRow({ row }: { row: AdminOrderRow }) {
         </div>
       </td>
 
-      <td className="px-4 py-3 text-right font-semibold">
+      <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
         {formatMoneyFromCents(row.totalCents)}
       </td>
 
@@ -298,7 +359,7 @@ function OrderRow({ row }: { row: AdminOrderRow }) {
         <StatusPill status={row.status} />
       </td>
 
-      <td className="px-4 py-3 text-slate-700">
+      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
         {time ? time.format("HH:mm DD/MM") : "—"}
       </td>
     </tr>

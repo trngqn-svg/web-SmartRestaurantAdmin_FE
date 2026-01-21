@@ -17,7 +17,9 @@ function StatusPill({ status }: { status: string }) {
   };
 
   const key = String(status ?? "").toLowerCase();
-  const cfg = map[key] ?? { label: key || "unknown", wrap: "bg-slate-100 text-slate-700", dot: "bg-slate-400" };
+  const cfg =
+    map[key] ??
+    ({ label: key || "unknown", wrap: "bg-slate-100 text-slate-700", dot: "bg-slate-400" } as const);
 
   return (
     <span className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium", cfg.wrap)}>
@@ -30,13 +32,12 @@ function StatusPill({ status }: { status: string }) {
 export default function CustomerMenuPage() {
   const [sp, setSp] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState(() => sp.get("q") ?? "");
   const [activeCategoryId, setActiveCategoryId] = useState(() => sp.get("cat") ?? "all");
   const [data, setData] = useState<CustomerMenuResponse | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     const next = new URLSearchParams(sp);
@@ -50,7 +51,7 @@ export default function CustomerMenuPage() {
     setSp(next, { replace: true });
   }, [search, activeCategoryId]);
 
-   useEffect(() => {
+  useEffect(() => {
     const key = "menu_scroll_y";
     const y = sessionStorage.getItem(key);
     if (y) {
@@ -84,7 +85,7 @@ export default function CustomerMenuPage() {
 
   const items = data?.items ?? [];
 
-    function openDetail(item: any) {
+  function openDetail(item: any) {
     const id = item?.id;
     if (!id) return;
 
@@ -94,6 +95,10 @@ export default function CustomerMenuPage() {
     navigate(`/customer/menu/${id}`, { state: { item, from } });
   }
 
+  function addToCart(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
 
   return (
     <div className="min-h-[100svh] bg-[#EEF1F5] flex flex-col">
@@ -101,19 +106,13 @@ export default function CustomerMenuPage() {
         {/* Header */}
         <div className="rounded-t-[28px] bg-slate-900 px-4 pt-4 pb-5">
           <div className="relative flex items-center justify-center">
-            <div
-              className="absolute left-0 inline-flex h-10 w-10 items-center justify-center">
-            </div>
+            <div className="absolute left-0 inline-flex h-10 w-10 items-center justify-center" />
 
             <h1 className="text-[#E2B13C] text-lg font-semibold">Smart Restaurant</h1>
 
             <div className="absolute right-0 rounded-full px-4 py-1.5 text-sm text-[#E2B13C]">
-              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-                  Table
-                </span>
-                <span className="text-lg font-black text-[#E2B13C] leading-none">
-                  #1
-                </span>
+              <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Table</span>
+              <span className="text-lg font-black text-[#E2B13C] leading-none">#1</span>
             </div>
           </div>
 
@@ -143,11 +142,7 @@ export default function CustomerMenuPage() {
                     type="button"
                     onClick={() => {
                       setActiveCategoryId(c.id);
-
-                      window.scrollTo({
-                        top: 0,
-                        behavior: "smooth",
-                      });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                     className={cn(
                       "shrink-0 rounded-full px-5 py-2.5 text-[14px] font-medium transition",
@@ -174,6 +169,7 @@ export default function CustomerMenuPage() {
                 key={it.id}
                 item={it}
                 onOpen={openDetail}
+                onAdd={addToCart}
                 name={it.name}
                 description={it.description}
                 price={it.price}
@@ -188,7 +184,7 @@ export default function CustomerMenuPage() {
         </div>
       </div>
 
-      <BottomNavMobileStyled cartCount={2}/>
+      <BottomNavMobileStyled cartCount={2} />
     </div>
   );
 }
@@ -196,6 +192,7 @@ export default function CustomerMenuPage() {
 function MenuCard(props: {
   item: any;
   onOpen: (item: any) => void;
+  onAdd: (e: React.MouseEvent, item: any) => void;
   name: string;
   description?: string;
   price: number;
@@ -205,13 +202,25 @@ function MenuCard(props: {
   rating: number;
   reviews: number;
 }) {
-  const { item, onOpen, name, description, price, canOrder, status, photoUrl, rating, reviews } = props;
+  const { item, onOpen, onAdd, name, description, price, canOrder, status, photoUrl, rating, reviews } = props;
+
+  const disabled = !canOrder; // if canOrder=false => disable add button
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onOpen(item)}
-      className="w-full text-left rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] active:scale-[0.995] transition"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(item);
+        }
+      }}
+      className={cn(
+        "w-full text-left rounded-2xl bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)] transition",
+        "active:scale-[0.995] cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-200"
+      )}
     >
       <div className="flex overflow-hidden rounded-2xl">
         <div className="relative h-[110px] w-[110px] shrink-0 bg-gradient-to-b from-indigo-500 to-purple-700">
@@ -224,14 +233,12 @@ function MenuCard(props: {
           )}
         </div>
 
-        <div className="flex-1 px-4 py-4">
+        <div className="flex-1 px-4 py-4 min-w-0">
           <div className="truncate text-[17px] font-semibold text-slate-800">{name}</div>
 
           <div className="mt-1 flex items-center gap-2 text-sm">
             <Star className="w-4 h-4 text-[#E2B13C] fill-[#E2B13C]" />
-            <span className="text-sm font-bold">
-              {rating || 0.0}
-            </span>
+            <span className="text-sm font-bold">{(rating || 0).toFixed(1)}</span>
             <span className="text-orange-500">({reviews} reviews)</span>
           </div>
 
@@ -243,18 +250,21 @@ function MenuCard(props: {
             <div className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-500">{description}</div>
           ) : null}
 
-          <div className="mt-3 flex items-center justify-between">
-            <div className="text-xl font-bold text-slate-900">${price.toFixed(2)}</div>
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="text-xl font-bold text-slate-900 whitespace-nowrap">${price.toFixed(2)}</div>
 
             <div className="shrink-0">
               <button
-                disabled={canOrder}
+                type="button"
+                disabled={disabled}
+                onClick={(e) => onAdd(e, item)}
                 className={cn(
                   "h-10 w-10 rounded-2xl flex items-center justify-center transition-all shadow-lg",
-                  canOrder
-                    ? "bg-[#0F172A] text-[#E2B13C] hover:bg-[#E2B13C] hover:text-[#0F172A]"
-                    : "bg-slate-100 text-slate-300 cursor-not-allowed"
+                  disabled
+                    ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                    : "bg-[#0F172A] text-[#E2B13C] hover:bg-[#E2B13C] hover:text-[#0F172A] active:scale-95"
                 )}
+                aria-label="Add to cart"
               >
                 <Plus className="w-5 h-5" strokeWidth={3} />
               </button>
@@ -262,6 +272,6 @@ function MenuCard(props: {
           </div>
         </div>
       </div>
-    </button>
+    </div>
   );
 }

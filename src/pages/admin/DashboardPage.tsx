@@ -70,15 +70,17 @@ export default function DashboardPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-4">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-3xl font-black text-slate-900 tracking-tight">Admin Dashboard</div>
+          <div className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+            Admin Dashboard
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 md:flex md:items-center md:gap-2">
           <button
             onClick={() => nav("/monitor/kds")}
-            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium hover:bg-slate-50"
+            className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium hover:bg-slate-50"
           >
             <Monitor className="h-4.5 w-4.5" />
             <span>Open KDS</span>
@@ -86,7 +88,7 @@ export default function DashboardPage() {
 
           <button
             onClick={() => nav("/orders")}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm text-white font-medium hover:text-black hover:bg-[#E2B13C]"
+            className="w-full md:w-auto flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm text-white font-medium hover:text-black hover:bg-[#E2B13C]"
           >
             <Plus className="h-4.5 w-4.5" />
             <span>New Order</span>
@@ -103,7 +105,7 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* KPI Today */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 md:gap-4">
             <KpiCard
               title="Revenue today"
               value={formatMoneyFromCents(data.today.revenueCents)}
@@ -143,10 +145,22 @@ export default function DashboardPage() {
 
               <div className="h-[280px] mt-3">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weekRevenue}>
+                  <BarChart
+                    data={weekRevenue}
+                    margin={{ top: 8, right: 12, left: 0, bottom: 8 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="label" />
-                    <YAxis tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`} />
+                    <XAxis
+                      dataKey="label"
+                      interval="preserveStartEnd"
+                      tickMargin={8}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis
+                      width={52}
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(v) => `${Math.round(v).toLocaleString("vi-VN")}`}
+                    />
                     <Tooltip
                       labelFormatter={(l) => `Day ${l}`}
                       formatter={(v: any) => `${Number(v).toLocaleString("vi-VN")} VND`}
@@ -185,7 +199,6 @@ export default function DashboardPage() {
                           <td className="px-4 py-3 text-slate-500">{idx + 1}</td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-slate-900">{it.name}</div>
-                            <div className="text-xs text-slate-500">{it.itemId}</div>
                           </td>
                           <td className="px-4 py-3 text-right font-semibold">
                             {it.orderCount.toLocaleString("vi-VN")}
@@ -217,12 +230,12 @@ export default function DashboardPage() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
-                    <th className="text-left font-medium px-4 py-3 w-[220px]">Order ID</th>
+                    <th className="hidden md:table-cell text-left font-medium px-4 py-3 w-[220px]">Order ID</th>
                     <th className="text-left font-medium px-4 py-3 w-[90px]">Table</th>
                     <th className="text-left font-medium px-4 py-3">Items</th>
                     <th className="text-right font-medium px-4 py-3 w-[140px]">Total</th>
-                    <th className="text-left font-medium px-4 py-3 w-[140px]">Status</th>
-                    <th className="text-right font-medium px-4 py-3 w-[110px]">Time</th>
+                    <th className="hidden lg:table-cell text-left font-medium px-4 py-3 w-[140px]">Status</th>
+                    <th className="hidden sm:table-cell text-right font-medium px-4 py-3 w-[110px]">Time</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -235,15 +248,30 @@ export default function DashboardPage() {
                   ) : (
                     recentOrders.map((o) => (
                       <tr key={o.orderId} className="border-t border-slate-100">
-                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{o.orderId}</td>
-                        <td className="px-4 py-3">#{o.tableNumber}</td>
-                        <td className="px-4 py-3 text-slate-700">{o.itemsSummary}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatMoneyFromCents(o.totalCents)}</td>
-                        <td className="px-4 py-3">{o.status}</td>
-                        <td className="px-4 py-3 text-right">
-                          {o.submittedAt ? dayjs(o.submittedAt).format("HH:mm") : "—"}
-                        </td>
-                      </tr>
+                      <td className="hidden md:table-cell px-4 py-3 font-mono text-xs text-slate-600">
+                        {o.orderId}
+                      </td>
+
+                      <td className="px-4 py-3 whitespace-nowrap">#{o.tableNumber}</td>
+
+                      <td className="px-4 py-3 text-slate-700">
+                        <div className="line-clamp-2">{o.itemsSummary}</div>
+                        {/* mobile show short id */}
+                        <div className="mt-1 md:hidden font-mono text-[11px] text-slate-400">
+                          {o.orderId.slice(-8)}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3 text-right font-semibold whitespace-nowrap">
+                        {formatMoneyFromCents(o.totalCents)}
+                      </td>
+
+                      <td className="hidden lg:table-cell px-4 py-3">{o.status}</td>
+
+                      <td className="hidden sm:table-cell px-4 py-3 text-right whitespace-nowrap">
+                        {o.submittedAt ? dayjs(o.submittedAt).format("HH:mm") : "—"}
+                      </td>
+                    </tr>
                     ))
                   )}
                 </tbody>
